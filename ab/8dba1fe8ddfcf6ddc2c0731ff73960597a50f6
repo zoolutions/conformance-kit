@@ -1,0 +1,29 @@
+spec/conformance_kit/shareability_spec.rb
+  s_1b610270a6114e::t_18172fe422d91e 36-49
+lib/conformance_kit/shareability.rb
+  s_1b610270a6114e::t_dc5fe645f276bd 26,29-31,39-53,59,67-69
+spec/conformance_kit/audit_spec.rb
+  s_1b610270a6114e::t_18172fe422d91e 38-45,122-130
+lib/conformance_kit/audit/cli.rb
+  s_1b610270a6114e::t_dc5fe645f276bd 27,30,57-61,80-81,85
+lib/conformance_kit/audit.rb
+  s_1b610270a6114e::t_dc5fe645f276bd 30-38,57
+README.md
+  s_1b610270a6114e::t_e8654809c504f2 20,106,109,114-117,123,147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ab8dba1fe8ddfcf6ddc2c0731ff73960597a50f6",
+  "prompts": {},
+  "sessions": {
+    "s_1b610270a6114e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "35e80e73-b879-4dbc-bae2-d74ddf035286",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
