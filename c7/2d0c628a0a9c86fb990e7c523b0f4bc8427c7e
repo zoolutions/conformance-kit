@@ -1,0 +1,28 @@
+CHANGELOG.md
+  s_1b610270a6114e::t_8e9e7df49ae962 5-10
+lib/conformance_kit/rspec.rb
+  s_1b610270a6114e::t_a9df0227b88d2f 3
+.github/workflows/main.yml
+  s_1b610270a6114e::t_025252e8032186 47
+  s_1b610270a6114e::t_b61cb198790292 41-46,48-53
+spec/conformance_kit/audit_spec.rb
+  s_1b610270a6114e::t_025252e8032186 143-144
+README.md
+  s_1b610270a6114e::t_74092e80771283 7-10,12-195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c72d0c628a0a9c86fb990e7c523b0f4bc8427c7e",
+  "prompts": {},
+  "sessions": {
+    "s_1b610270a6114e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "35e80e73-b879-4dbc-bae2-d74ddf035286",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
