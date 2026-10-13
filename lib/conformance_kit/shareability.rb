@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 module ConformanceKit
-  # Finds WHY a value is not Ractor-shareable: the deepest offending object,
-  # the path to it, and the fix.
+  # Finds WHY a value is not Ractor-shareable: the first offending object on a
+  # depth-first walk (followed as deep as it goes), the path to it, and the fix.
+  # Works on any value, BasicObject included: it only calls core methods.
   module Shareability
     Culprit = Data.define(:path, :object_class, :reason)
 
@@ -27,7 +28,7 @@ module ConformanceKit
 
         seen[value.__id__] = true
         # Freezing an unfrozen container would not fix a lock or a Proc inside it.
-        return intrinsic_below(value, path, seen, depth) || blame(value, path) unless value.frozen?
+        return intrinsic_below(value, path, seen, depth) || blame(value, path) unless frozen?(value)
 
         children(value).each do |child_path, child|
           found = find(child, path + child_path, seen, depth + 1)
@@ -54,7 +55,7 @@ module ConformanceKit
       end
 
       def children(value)
-        pairs = value.instance_variables.map { |ivar| [".#{ivar}", value.instance_variable_get(ivar)] }
+        pairs = core(:instance_variables, value).map { |ivar| [".#{ivar}", core(:instance_variable_get, value, ivar)] }
         case value
         when ::Hash then pairs + hash_children(value)
         when ::Array then pairs + value.each_with_index.map { |v, i| ["[#{i}]", v] }
@@ -65,8 +66,10 @@ module ConformanceKit
       end
 
       def hash_children(hash)
-        pairs = hash.flat_map { |k, v| [["{key #{k.inspect}}", k], ["[#{k.inspect}]", v]] }
-        hash.default_proc ? pairs + [[".default_proc", hash.default_proc]] : pairs
+        pairs = hash.flat_map { |k, v| [["{key #{label(k)}}", k], ["[#{label(k)}]", v]] }
+        return pairs + [[".default_proc", hash.default_proc]] if hash.default_proc
+
+        hash.default.nil? ? pairs : pairs + [[".default", hash.default]]
       end
 
       def blame(value, path)
@@ -81,7 +84,7 @@ module ConformanceKit
         elsif lock?(value) || concurrent?(value)
           "#{article(name)} #{name} is main-only: keep per-Ractor state in ConformanceKit::Store, " \
             "or allowlist it main_only"
-        elsif !value.frozen?
+        elsif !frozen?(value)
           "#{article(name)} #{name} that is not frozen: freeze it at boot (Ractor.make_shareable)"
         else
           "#{article(name)} #{name} that is frozen but not shareable (an extension object, or unshareable internals)"
@@ -89,7 +92,22 @@ module ConformanceKit
       end
 
       def article(name) = name.match?(/\A[AEIOU]/) ? "an" : "a"
-      def callable?(value) = value.is_a?(::Proc) || value.is_a?(::Method) || value.is_a?(::UnboundMethod)
+
+      # Module#=== rather than value.is_a?, which a BasicObject lacks.
+      def callable?(value)
+        [::Proc, ::Method, ::UnboundMethod].any? { _1 === value } # rubocop:disable Style/CaseEquality
+      end
+
+      def frozen?(value) = core(:frozen?, value)
+      def core(method, value, *) = ::Kernel.instance_method(method).bind_call(value, *)
+
+      # A key's #inspect is consumer code: never let it abort the walk.
+      def label(key)
+        key.inspect
+      rescue StandardError
+        "#<#{class_name(key)}>"
+      end
+
       def lock?(value) = LOCKS.include?(class_name(value))
       def concurrent?(value) = class_name(value).start_with?("Concurrent::")
       def class_name(value) = ::Kernel.instance_method(:class).bind_call(value).name || "anonymous class"

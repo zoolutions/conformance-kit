@@ -70,6 +70,26 @@ RSpec.describe ConformanceKit::Store do
     end
   end
 
+  context "inside a non-main Ractor on the fallback path (Ruby 3.2/3.3)", :ractor do
+    before do
+      if described_class.native?
+        skip "Ractor.store_if_absent exists on #{RUBY_VERSION}: the native path is covered below"
+      end
+    end
+
+    it "keeps a per-Ractor value instead of touching the main-only fallback" do
+      main = described_class.fetch(:conformance_kit_store_fallback_ractor) { Object.new }
+      ractor = Ractor.new do
+        first = ConformanceKit::Store.fetch(:conformance_kit_store_fallback_ractor) { Object.new }
+        [first.__id__, ConformanceKit::Store.fetch(:conformance_kit_store_fallback_ractor) { :again }.__id__]
+      end
+      ids = ractor.respond_to?(:value) ? ractor.value : ractor.take
+
+      expect(ids.uniq.size).to eq(1)
+      expect(ids.first).not_to eq(main.__id__)
+    end
+  end
+
   context "inside a non-main Ractor", :ractor do
     before do
       skip "Ractor#value needs Ruby 4.0+ (#{RUBY_VERSION})" unless defined?(Ractor) && Ractor.method_defined?(:value)

@@ -30,6 +30,11 @@ RSpec.describe ConformanceKit::Checks::FiberReactor do
     end
   end
 
+  it "rejects non-positive counts, which would pass without a single call" do
+    expect { described_class.call(fibers: 0) { 1 } }.to raise_error(ArgumentError, /fibers:/)
+    expect { described_class.call(iterations: -1) { 1 } }.to raise_error(ArgumentError, /iterations:/)
+  end
+
   it "skips with a reason when async cannot be loaded" do
     loader = -> { raise LoadError, "cannot load such file -- async" }
     result = described_class.call(loader: loader) { :never_called }

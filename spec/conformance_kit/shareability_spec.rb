@@ -47,6 +47,28 @@ RSpec.describe ConformanceKit::Shareability do
     expect(culprit.object_class).to eq("Proc")
   end
 
+  it "names a frozen Hash's unshareable default value" do
+    culprit = described_class.culprit(Hash.new([]).freeze) # rubocop:disable Lint/SharedMutableDefault -- the culprit
+
+    expect(culprit.path).to eq(".default")
+  end
+
+  it "handles BasicObject values" do
+    culprit = described_class.culprit([BasicObject.new].freeze)
+
+    expect(culprit.path).to eq("[0]")
+    expect(culprit.object_class).to eq("BasicObject")
+  end
+
+  it "labels a Hash key whose #inspect raises without raising itself" do
+    key = Object.new
+    def key.inspect = raise("boom")
+    key.freeze
+    culprit = described_class.culprit({ key => [] }.freeze)
+
+    expect(culprit.path).to eq("[#<Object>]")
+  end
+
   it "names an UnboundMethod as never shareable" do
     expect(described_class.culprit(Module.instance_method(:name).freeze).reason).to include("UnboundMethod",
                                                                                             "never shareable")

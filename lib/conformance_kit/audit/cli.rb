@@ -46,7 +46,9 @@ module ConformanceKit
         OptionParser.new do |o|
           o.banner = "Usage: conformance-audit --require FILE --namespace CONST [--strict] [--allowlist PATH]"
           o.on("--require FILE", "Require FILE before auditing (repeatable)") { options[:requires] << _1 }
-          o.on("--namespace CONST", "Audit CONST and everything under it (repeatable)") { options[:namespaces] << _1 }
+          o.on("--namespace CONST", "Audit CONST and everything under it (repeatable)") do |name|
+            options[:namespaces] << name.delete_prefix("::")
+          end
           o.on("--strict", "Exit 1 on any unallowlisted finding") { options[:strict] = true }
           o.on("--allowlist PATH", "main_only: allowlist (default: #{DEFAULT_ALLOWLIST} if present)") do |path|
             options[:allowlist] = path

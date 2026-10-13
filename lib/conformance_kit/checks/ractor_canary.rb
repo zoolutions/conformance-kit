@@ -12,8 +12,9 @@ module ConformanceKit
         def call(inputs: [], &block)
           return Result.skip(unavailable) unless available?
 
+          ractor = ::Ractor.new(*inputs, &block) # copies the inputs before the main run can mutate them
           expected = block.call(*inputs)
-          actual = ::Ractor.new(*inputs, &block).value
+          actual = ractor.value
           return Result.pass if actual == expected
 
           Result.fail("#{NAME}: returned #{actual.inspect} inside the Ractor " \

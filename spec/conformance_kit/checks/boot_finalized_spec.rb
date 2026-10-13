@@ -35,6 +35,11 @@ RSpec.describe ConformanceKit::Checks::BootFinalized do
     expect(result.message).to include("#{__FILE__}:#{__LINE__ - 3}")
   end
 
+  it "rejects an empty readers: list, which would certify nothing" do
+    expect { described_class.call(readers: []) }.to raise_error(ArgumentError, /readers:/)
+    expect { described_class.call(readers: {}) }.to raise_error(ArgumentError, /readers:/)
+  end
+
   it "reports a reader that raises" do
     result = described_class.call(readers: { "Config.broken" => -> { raise KeyError, "nope" } })
 

@@ -32,7 +32,7 @@ module ConformanceKit
     # Constants declared with `autoload` but never loaded: not audited.
     def skipped_autoloads
       audited_modules.flat_map do |mod, name|
-        mod.constants(false).select { mod.autoload?(_1) }.map { "#{name}::#{_1}" }
+        constants_of(mod).select { autoload?(mod, _1) }.map { "#{name}::#{_1}" }
       end
     end
 
@@ -67,18 +67,25 @@ module ConformanceKit
     end
 
     def constant_findings(mod, name)
-      mod.constants(false).filter_map do |constant|
-        next if mod.autoload?(constant)
+      constants_of(mod).filter_map do |constant|
+        next if autoload?(mod, constant)
 
-        finding("#{name}::#{constant}", "constant", mod.const_get(constant, false))
+        finding("#{name}::#{constant}", "constant", core(::Module, :const_get, mod, constant, false))
       end
     end
 
     def ivar_findings(mod, name)
-      mod.instance_variables.filter_map do |ivar|
-        finding("#{name}.#{ivar}", mod.is_a?(Class) ? "class ivar" : "module ivar", mod.instance_variable_get(ivar))
+      core(::Kernel, :instance_variables, mod).filter_map do |ivar|
+        kind = mod.is_a?(Class) ? "class ivar" : "module ivar"
+        finding("#{name}.#{ivar}", kind, core(::Kernel, :instance_variable_get, mod, ivar))
       end
     end
+
+    # The core reflection methods, bound directly: a module may override its own
+    # `.constants` or `.instance_variables` and hide state from the audit.
+    def core(owner, method, receiver, *) = owner.instance_method(method).bind_call(receiver, *)
+    def constants_of(mod) = core(::Module, :constants, mod, false)
+    def autoload?(mod, constant) = core(::Module, :autoload?, mod, constant)
 
     def finding(name, kind, value)
       culprit = Shareability.culprit(value)

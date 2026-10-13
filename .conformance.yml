@@ -2,6 +2,6 @@
 # --namespace ConformanceKit --strict`): the kit obeys the tiers it enforces.
 main_only:
   - name: ConformanceKit::Store.@fallback_lock
-    reason: the below-3.4 fallback's lock, created at load; on 3.4+ Store uses Ractor.store_if_absent and never reads it
+    reason: the below-3.4 fallback's lock, created at load and only read on the main Ractor (non-main Ractors use Ractor-local storage; 3.4+ uses Ractor.store_if_absent)
   - name: ConformanceKit::Store.@fallback_values
-    reason: the below-3.4 fallback's storage, only touched under @fallback_lock; never read on 3.4+
+    reason: the below-3.4 fallback's storage, only touched on the main Ractor under @fallback_lock; never read on 3.4+

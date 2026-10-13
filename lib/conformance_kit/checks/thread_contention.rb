@@ -10,6 +10,7 @@ module ConformanceKit
 
       class << self
         def call(threads: 8, iterations: 50, consistent: nil, &subject)
+          Consistency.validate_counts!(threads: threads, iterations: iterations)
           Consistency.validate!(consistent)
           outcomes = run(threads, iterations, subject)
           errors = outcomes.grep(Exception)

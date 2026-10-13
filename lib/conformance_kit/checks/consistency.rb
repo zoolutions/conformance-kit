@@ -8,6 +8,15 @@ module ConformanceKit
       MODES = %i[identical equal].freeze
 
       class << self
+        def validate_counts!(**counts)
+          counts.each do |name, count|
+            next if count.is_a?(Integer) && count.positive?
+
+            raise ArgumentError, "#{name}: must be a positive Integer (got #{count.inspect}); " \
+                                 "zero would pass without a single call"
+          end
+        end
+
         def validate!(consistent)
           return if consistent.nil? || consistent.respond_to?(:call) || MODES.include?(consistent)
 
@@ -20,7 +29,7 @@ module ConformanceKit
           case consistent
           when nil then nil
           when :identical then distinct(results.uniq(&:__id__), consistent)
-          when :equal then distinct(results.uniq, consistent)
+          when :equal then distinct(uniq_by_equality(results), consistent)
           else "the `consistent:` check returned false for #{results.size} results" unless consistent.call(results)
           end
         end
@@ -32,6 +41,11 @@ module ConformanceKit
         end
 
         private
+
+        # Array#uniq compares with eql?/hash (1 and 1.0 differ); :equal promises ==.
+        def uniq_by_equality(results)
+          results.each_with_object([]) { |result, seen| seen << result unless seen.any? { |s| s == result } }
+        end
 
         def distinct(unique, mode)
           return nil if unique.size <= 1

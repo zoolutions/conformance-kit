@@ -43,6 +43,19 @@ RSpec.describe ConformanceKit::Audit do
       AuditFixture::Hooks.send(:remove_const, :Lazy)
     end
 
+    it "is not fooled by a module that overrides .constants or .instance_variables" do
+      # Its own namespace: a removed stub keeps its name in ObjectSpace.
+      stub_const("AuditSneakyFixture", Module.new do
+        const_set(:LOCK, Mutex.new)
+        instance_variable_set(:@hooks, [])
+        def self.constants(*) = []
+        def self.instance_variables = []
+      end)
+
+      expect(audit(namespaces: ["AuditSneakyFixture"]).findings.map(&:name))
+        .to eq(["AuditSneakyFixture.@hooks", "AuditSneakyFixture::LOCK"])
+    end
+
     it "stays inside the namespace" do
       expect(audit(namespaces: ["AuditFixture::Hooks"]).findings.map(&:name)).to eq(["AuditFixture::Hooks.@on_save"])
     end
@@ -117,6 +130,22 @@ RSpec.describe ConformanceKit::Audit do
     it "exits 2 on a namespace that is not defined" do
       expect(run_cli("--require", fixture, "--namespace", "NoSuchFixture")).to eq(2)
       expect(err.string).to include("NoSuchFixture")
+    end
+
+    it "accepts a namespace written with a leading ::" do
+      expect(run_cli("--require", fixture, "--namespace", "::AuditFixture", "--strict", "--allowlist",
+                     File::NULL)).to eq(1)
+      expect(out.string).to include("4 findings in AuditFixture")
+    end
+
+    it "exits 2 on an allowlist YAML that safe_load rejects" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "allowlist.yml")
+        File.write(path, "main_only:\n  - &entry\n    name: AuditFixture::LOCK\n    reason: x\n  - *entry\n")
+
+        expect(run_cli("--require", fixture, "--namespace", "AuditFixture", "--allowlist", path)).to eq(2)
+        expect(err.string).to include(path)
+      end
     end
 
     it "exits 2 on a namespace that is not a module" do

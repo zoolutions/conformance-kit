@@ -105,7 +105,8 @@ RSpec.describe "config/ and the reusable workflows" do
 
     it "takes the gem and the optional roundhouse app" do
       expect(inputs.keys).to contain_exactly("gem-name", "ruby-version", "paths", "roundhouse-app",
-                                             "roundhouse-version", "artifact-name", "working-directory")
+                                             "roundhouse-version", "roundhouse-sha256", "artifact-name",
+                                             "working-directory")
       expect(inputs.dig("gem-name", "required")).to be(true)
       expect(inputs.dig("roundhouse-app", "default")).to eq("")
     end
@@ -116,6 +117,14 @@ RSpec.describe "config/ and the reusable workflows" do
       expect(probes.map { _1["name"] }).to contain_exactly("Probe: rubocop_spinel", "Probe: spinel-compat",
                                                            "Probe: roundhouse check")
       expect(probes.map { _1["continue-on-error"] }).to all(be(true))
+    end
+
+    it "checks the roundhouse binary against a pinned digest, never piping an installer to sh" do
+      script = steps.find { _1["name"] == "Probe: roundhouse check" }.fetch("run")
+
+      expect(inputs.dig("roundhouse-sha256", "default")).to match(/\A\h{64}\z/)
+      expect(script).to include("sha256sum --check")
+      expect(script).not_to match(/\|\s*sh\b/)
     end
 
     it "uploads the reports as an artifact even when a probe failed" do

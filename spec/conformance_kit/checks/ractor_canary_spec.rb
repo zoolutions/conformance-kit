@@ -25,6 +25,12 @@ RSpec.describe ConformanceKit::Checks::RactorCanary do
       expect(result.message).to include("capture-free", "factor")
     end
 
+    it "gives the Ractor the inputs as they were, even when the main run mutates them" do
+      result = described_class.call(inputs: [[]]) { |list| list << :seen and list.size }
+
+      expect(result).to be_passed
+    end
+
     it "fails when the Ractor result differs from the main one" do
       result = described_class.call { Ractor.main? ? :main : :other }
 

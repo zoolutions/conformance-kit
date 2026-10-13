@@ -10,6 +10,7 @@ module ConformanceKit
 
       class << self
         def call(fibers: 8, iterations: 50, consistent: nil, loader: -> { require "async" }, &subject)
+          Consistency.validate_counts!(fibers: fibers, iterations: iterations)
           Consistency.validate!(consistent)
           begin
             loader.call

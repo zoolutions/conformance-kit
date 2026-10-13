@@ -45,6 +45,19 @@ RSpec.describe ConformanceKit::Checks::ThreadContention do
     expect(result).to be_passed
   end
 
+  it "rejects non-positive counts, which would pass without a single call" do
+    expect { described_class.call(threads: 0) { 1 } }.to raise_error(ArgumentError, /threads:/)
+    expect { described_class.call(iterations: 0) { 1 } }.to raise_error(ArgumentError, /iterations:/)
+  end
+
+  it "compares with == under consistent: :equal, not eql?" do
+    values = Queue.new
+    [1, 1.0].each { values << _1 }
+    result = described_class.call(threads: 2, iterations: 1, consistent: :equal) { values.pop }
+
+    expect(result).to be_passed
+  end
+
   it "rejects an unknown consistency mode" do
     expect { described_class.call(consistent: :sorta) { 1 } }.to raise_error(ArgumentError, /consistent:/)
   end

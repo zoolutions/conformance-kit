@@ -22,7 +22,7 @@ module ConformanceKit
         raise AllowlistError, "#{path}: expected a mapping with a main_only: list" unless data.is_a?(Hash)
 
         new(data.fetch("main_only", []) || [], source: path)
-      rescue Psych::SyntaxError => e
+      rescue Psych::Exception => e
         raise AllowlistError, "#{path}: #{e.message}"
       end
 

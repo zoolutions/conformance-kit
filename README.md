@@ -73,6 +73,7 @@ a boot-finalized configuration: 1 of 2 readers returned a value that is not Ract
 ## Assertions (Minitest)
 
 ```ruby
+require "minitest/autorun" # the kit never loads Minitest itself
 require "conformance_kit/minitest"
 
 class CacheTest < Minitest::Test
@@ -95,7 +96,7 @@ Per-Ractor lazy storage, the home for caches that must not live in a class ivar 
 def self.cache = ConformanceKit::Store.fetch(:my_gem_cache) { {} }
 ```
 
-On Ruby 3.4+ this is `Ractor.store_if_absent` (atomic, one value per Ractor). Below 3.4, and on engines without `Ractor`, it falls back to one Mutex-guarded Hash: safe there, since a non-main Ractor cannot run your code before 4.0 anyway. Keys are Symbols; prefix them with your gem's name.
+On Ruby 3.4+ this is `Ractor.store_if_absent` (atomic, one value per Ractor). Below 3.4 the main Ractor (and an engine without `Ractor`) uses one Mutex-guarded Hash, and a non-main Ractor keeps its own values in Ractor-local storage, unlocked: two threads of that one Ractor can race to build a value, as with `||=`. Keys are Symbols; prefix them with your gem's name.
 
 ## `conformance-audit`
 
@@ -186,6 +187,7 @@ jobs:
 | `paths` | `lib` | what rubocop_spinel inspects (space-separated) |
 | `roundhouse-app` | `""` | a Rails app directory (e.g. `spec/dummy`); empty skips it |
 | `roundhouse-version` | `v2026.9.18` | the rubys/roundhouse release to install |
+| `roundhouse-sha256` | that release's Linux tarball | checked before the binary runs; change it with `roundhouse-version` |
 | `artifact-name` | `conformance-probes` | |
 | `working-directory` | `.` | |
 

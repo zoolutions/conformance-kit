@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# The conformance-audit fixture: three findings, one allowlisted main-only
-# entry, and shareable state that must NOT be reported.
+# The conformance-audit fixture: four findings (audit_allowlist.yml allowlists
+# all four) and shareable state that must NOT be reported.
 module AuditFixture
   LOCK = Mutex.new
   NAMES = %w[alpha beta] # rubocop:disable Style/MutableConstant -- the unfrozen Array finding

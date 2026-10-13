@@ -34,6 +34,10 @@ on:
         description: The rubys/roundhouse release to install
         type: string
         default: v2026.9.18
+      roundhouse-sha256:
+        description: SHA-256 of that release's x86_64-unknown-linux-musl tarball (change it with roundhouse-version)
+        type: string
+        default: aa8b13f53154ad41cc0a83088f6d4f06532760ec8dbeb165eccc0c946bcd7945
       artifact-name:
         description: Name of the uploaded reports artifact
         type: string
@@ -95,11 +99,16 @@ jobs:
         env:
           APP: ${{ inputs.roundhouse-app }}
           ROUNDHOUSE_VERSION: ${{ inputs.roundhouse-version }}
+          ROUNDHOUSE_SHA256: ${{ inputs.roundhouse-sha256 }}
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf \
-            "https://github.com/rubys/roundhouse/releases/download/$ROUNDHOUSE_VERSION/roundhouse-installer.sh" | sh
-          export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
-          roundhouse check --continue "$APP" 2>&1 | tee conformance-probes/roundhouse.txt
+          # The release binary, checked against a pinned digest before it runs (never a piped installer).
+          tarball=roundhouse-x86_64-unknown-linux-musl.tar.xz
+          curl --proto '=https' --tlsv1.2 -fLsS -o "$RUNNER_TEMP/$tarball" \
+            "https://github.com/rubys/roundhouse/releases/download/$ROUNDHOUSE_VERSION/$tarball"
+          echo "$ROUNDHOUSE_SHA256  $RUNNER_TEMP/$tarball" | sha256sum --check --strict
+          tar -xJf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/roundhouse-x86_64-unknown-linux-musl/roundhouse" check --continue "$APP" 2>&1 \
+            | tee conformance-probes/roundhouse.txt
 
       - name: Summary
         if: always()

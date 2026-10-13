@@ -11,6 +11,8 @@ module ConformanceKit
 
       class << self
         def call(readers:, finalize: nil)
+          raise ArgumentError, "readers: is empty, so #{NAME} would check nothing" if readers.nil? || readers.empty?
+
           unless Shareability.available?
             return Result.skip("#{NAME} needs Ractor.shareable?, which #{RUBY_ENGINE} #{RUBY_VERSION} lacks")
           end
