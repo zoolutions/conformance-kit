@@ -34,7 +34,7 @@ module ConformanceKit
       end
 
       def leaf?(value)
-        value.is_a?(::Proc) || value.is_a?(::Method) || lock?(value) || concurrent?(value) || !value.frozen?
+        callable?(value) || lock?(value) || concurrent?(value) || !value.frozen?
       end
 
       def children(value)
@@ -54,18 +54,21 @@ module ConformanceKit
 
       def reason(value)
         name = class_name(value)
-        if value.is_a?(::Proc) || value.is_a?(::Method)
-          "a #{name} is never shareable: use Ractor.shareable_proc (Ruby 4.0) " \
+        if callable?(value)
+          "#{article(name)} #{name} is never shareable: use Ractor.shareable_proc (Ruby 4.0) " \
             "or Ractor.make_shareable on a capture-free proc"
         elsif lock?(value) || concurrent?(value)
-          "a #{name} is main-only: keep per-Ractor state in ConformanceKit::Store, or allowlist it main_only"
+          "#{article(name)} #{name} is main-only: keep per-Ractor state in ConformanceKit::Store, " \
+            "or allowlist it main_only"
         elsif !value.frozen?
-          "a #{name} that is not frozen: freeze it at boot (Ractor.make_shareable)"
+          "#{article(name)} #{name} that is not frozen: freeze it at boot (Ractor.make_shareable)"
         else
-          "a #{name} that is frozen but not shareable (an extension object, or unshareable internals)"
+          "#{article(name)} #{name} that is frozen but not shareable (an extension object, or unshareable internals)"
         end
       end
 
+      def article(name) = name.match?(/\A[AEIOU]/) ? "an" : "a"
+      def callable?(value) = value.is_a?(::Proc) || value.is_a?(::Method) || value.is_a?(::UnboundMethod)
       def lock?(value) = LOCKS.include?(class_name(value))
       def concurrent?(value) = class_name(value).start_with?("Concurrent::")
       def class_name(value) = ::Kernel.instance_method(:class).bind_call(value).name || "anonymous class"

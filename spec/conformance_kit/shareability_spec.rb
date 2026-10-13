@@ -33,6 +33,11 @@ RSpec.describe ConformanceKit::Shareability do
     expect(described_class.culprit(proc { 1 }.freeze).reason).to include("Proc", "Ractor.shareable_proc")
   end
 
+  it "names an UnboundMethod as never shareable" do
+    expect(described_class.culprit(Module.instance_method(:name).freeze).reason).to include("UnboundMethod",
+                                                                                            "never shareable")
+  end
+
   it "survives cycles" do
     list = [[]]
     list << list

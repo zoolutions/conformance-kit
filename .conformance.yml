@@ -1,0 +1,7 @@
+# conformance-kit's own audit (`exe/conformance-audit --require ./lib/conformance_kit
+# --namespace ConformanceKit --strict`): the kit obeys the tiers it enforces.
+main_only:
+  - name: ConformanceKit::Store.@fallback_lock
+    reason: the below-3.4 fallback's lock, created at load; on 3.4+ Store uses Ractor.store_if_absent and never reads it
+  - name: ConformanceKit::Store.@fallback_values
+    reason: the below-3.4 fallback's storage, only touched under @fallback_lock; never read on 3.4+

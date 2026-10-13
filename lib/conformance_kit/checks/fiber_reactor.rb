@@ -7,10 +7,9 @@ module ConformanceKit
     # the kit: skipped with a reason when it cannot be loaded.
     module FiberReactor
       NAME = "fiber-safe under an Async reactor"
-      LOAD_ASYNC = -> { require "async" }
 
       class << self
-        def call(fibers: 8, iterations: 50, consistent: nil, loader: LOAD_ASYNC, &subject)
+        def call(fibers: 8, iterations: 50, consistent: nil, loader: -> { require "async" }, &subject)
           Consistency.validate!(consistent)
           begin
             loader.call
