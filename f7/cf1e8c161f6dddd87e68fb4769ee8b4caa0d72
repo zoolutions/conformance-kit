@@ -1,0 +1,92 @@
+lib/conformance_kit/rspec.rb
+  s_1b610270a6114e::t_d6431bd01dade8 39-40,48-49
+  s_1b610270a6114e::t_a2df29f7bef79c 25,29-30,34
+  s_1b610270a6114e::t_daba221039eb26 31-33
+  s_1b610270a6114e::t_c1d3e62d31d3ca 1-24,26-28,35-38,41-47,50-73
+spec/fixtures/configs.rb
+  s_1b610270a6114e::t_445a0fadb69a4c 1-37
+spec/support/sandbox.rb
+  s_1b610270a6114e::t_44bc4e82f3b1b9 1-18
+Gemfile
+  s_1b610270a6114e::t_3dbc0666a89b50 11-14
+spec/support/fixtures.rb
+  s_1b610270a6114e::t_501f6cb05cb687 1-3
+spec/conformance_kit/minitest_spec.rb
+  s_1b610270a6114e::t_cdacc82eadf540 10,57-59,67-69
+  s_1b610270a6114e::t_e406e78986d2f6 1-9,11-56,60-66,70-102
+lib/conformance_kit.rb
+  s_1b610270a6114e::t_44bc538b5f7437 4,6-11
+  s_1b610270a6114e::t_31a338f40cfbbd 5
+spec/conformance_kit/checks/fiber_reactor_spec.rb
+  s_1b610270a6114e::t_ef3d7fc0795d61 1-14,17-40
+  s_1b610270a6114e::t_cdacc82eadf540 15-16
+lib/conformance_kit/checks/fiber_reactor.rb
+  s_1b610270a6114e::t_44bc538b5f7437 1-41,43-50
+  s_1b610270a6114e::t_a2df29f7bef79c 42
+.rubocop.yml
+  s_1b610270a6114e::t_cdacc82eadf540 21-26
+  s_1b610270a6114e::t_a2df29f7bef79c 27-37
+spec/conformance_kit/checks/boot_finalized_spec.rb
+  s_1b610270a6114e::t_ef3d7fc0795d61 1-10,13-52
+  s_1b610270a6114e::t_cdacc82eadf540 11-12
+lib/conformance_kit/checks/consistency.rb
+  s_1b610270a6114e::t_44bc538b5f7437 1-4,7-25,32-45
+  s_1b610270a6114e::t_a2df29f7bef79c 5-6,26-31
+spec/conformance_kit/shareability_spec.rb
+  s_1b610270a6114e::t_9874a9fb63824d 37,40
+  s_1b610270a6114e::t_501f6cb05cb687 1-36,38-39,41-42
+spec/fixtures/request_context.rb
+  s_1b610270a6114e::t_445a0fadb69a4c 1-29
+lib/conformance_kit/shareability.rb
+  s_1b610270a6114e::t_44bc538b5f7437 1-12,14-57,60-74
+  s_1b610270a6114e::t_a2df29f7bef79c 13,58-59
+spec/spec_helper.rb
+  s_1b610270a6114e::t_bc87678a08b138 3,6
+lib/conformance_kit/checks/ractor_canary.rb
+  s_1b610270a6114e::t_a2df29f7bef79c 19-20
+  s_1b610270a6114e::t_44bc538b5f7437 1-18,21-40
+spec/conformance_kit/store_spec.rb
+  s_1b610270a6114e::t_a2df29f7bef79c 47
+  s_1b610270a6114e::t_cdacc82eadf540 1-46,48-89
+spec/conformance_kit/checks/thread_contention_spec.rb
+  s_1b610270a6114e::t_ef3d7fc0795d61 1-13,16-51
+  s_1b610270a6114e::t_cdacc82eadf540 14-15
+spec/conformance_kit/checks/ractor_canary_spec.rb
+  s_1b610270a6114e::t_ef3d7fc0795d61 1-44
+spec/fixtures/caches.rb
+  s_1b610270a6114e::t_445a0fadb69a4c 1-51
+spec/conformance_kit/rspec_spec.rb
+  s_1b610270a6114e::t_cdacc82eadf540 66-67
+  s_1b610270a6114e::t_44bc4e82f3b1b9 1-65,68-130
+lib/conformance_kit/result.rb
+  s_1b610270a6114e::t_44bc538b5f7437 1-15
+lib/conformance_kit/store.rb
+  s_1b610270a6114e::t_a2df29f7bef79c 29
+  s_1b610270a6114e::t_6876e3063a0c53 1-28,30-33
+lib/conformance_kit/checks/boot_finalized.rb
+  s_1b610270a6114e::t_cdacc82eadf540 14-16
+  s_1b610270a6114e::t_44bc538b5f7437 1-13,17-22,25-60
+  s_1b610270a6114e::t_a2df29f7bef79c 23-24
+lib/conformance_kit/checks/thread_contention.rb
+  s_1b610270a6114e::t_44bc538b5f7437 1-15,17-40
+  s_1b610270a6114e::t_a2df29f7bef79c 16
+lib/conformance_kit/minitest.rb
+  s_1b610270a6114e::t_e406e78986d2f6 1-18,22-43
+  s_1b610270a6114e::t_cdacc82eadf540 19-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f7cf1e8c161f6dddd87e68fb4769ee8b4caa0d72",
+  "prompts": {},
+  "sessions": {
+    "s_1b610270a6114e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "35e80e73-b879-4dbc-bae2-d74ddf035286",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
