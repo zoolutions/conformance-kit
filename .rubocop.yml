@@ -1,0 +1,20 @@
+plugins:
+  - rubocop-thread_safety
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "vendor/**/*"
+    - "tmp/**/*"
+    # The zoolutions release kit, byte-identical across the gems: never restyle it here.
+    - "rakelib/release.rake"
+    - "bin/release"
+    - "bin/labels"
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/Documentation:
+  Enabled: false
