@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "rspec/core"
 require "conformance_kit"
 
 module ConformanceKit

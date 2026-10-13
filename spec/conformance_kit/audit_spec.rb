@@ -140,7 +140,8 @@ RSpec.describe ConformanceKit::Audit do
     end
 
     it "passes the kit's own audit with its .conformance.yml" do
-      out, _err, status = exe("--require", "./lib/conformance_kit", "--namespace", "ConformanceKit", "--strict")
+      requires = %w[audit rspec minitest].flat_map { ["--require", "./lib/conformance_kit/#{_1}"] }
+      out, _err, status = exe(*requires, "--namespace", "ConformanceKit", "--strict")
 
       expect(status.exitstatus).to eq(0), out
     end
