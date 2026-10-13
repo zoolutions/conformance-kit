@@ -18,3 +18,24 @@ Style/StringLiterals:
 
 Style/Documentation:
   Enabled: false
+
+# spec/fixtures/ violate the tiers ON PURPOSE: each check must be seen failing
+# on a violating fixture (.claude/rules/testing.md).
+ThreadSafety:
+  Exclude:
+    - "spec/fixtures/**/*"
+
+# Store.fetch requires its block (it is the per-Ractor initializer), so the
+# cop's `fetch(key, default)` suggestion does not apply to it.
+Style/RedundantFetchBlock:
+  Exclude:
+    - "spec/conformance_kit/store_spec.rb"
+
+# The specs start threads to hammer the Store and the fixtures.
+ThreadSafety/NewThread:
+  Exclude:
+    - "spec/**/*"
+
+# As in phlex-reactive: method and block size are reviewed, not counted.
+Metrics:
+  Enabled: false

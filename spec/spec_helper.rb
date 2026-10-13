@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
+require "securerandom"
 require "conformance_kit"
+
+Dir[File.join(__dir__, "support", "**", "*.rb")].each { require _1 }
 
 RSpec.configure do |config|
   config.disable_monkey_patching!
