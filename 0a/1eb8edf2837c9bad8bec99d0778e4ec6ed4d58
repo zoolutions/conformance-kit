@@ -1,0 +1,19 @@
+.claude/commands/review-pr.md
+  s_b2ece0bcc7f2d2::t_375b1a9a84a9b2 4-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0a1eb8edf2837c9bad8bec99d0778e4ec6ed4d58",
+  "prompts": {},
+  "sessions": {
+    "s_b2ece0bcc7f2d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13a3aeb5-4968-425a-a858-ce46384a2ff4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
