@@ -1,0 +1,123 @@
+name: Compiler probes
+
+# Reusable Tier 4 probes (conformance-kit): REPORT-ONLY, never a merge gate.
+# Every probe step continues on error; the reports are uploaded as an artifact
+# and summarised on the run. In a consuming gem:
+#
+#   jobs:
+#     probes:
+#       uses: zoolutions/conformance-kit/.github/workflows/probes.yml@main
+#       with:
+#         gem-name: my_gem
+#         roundhouse-app: spec/dummy   # optional: a Rails app to `roundhouse check`
+
+on:
+  workflow_call:
+    inputs:
+      gem-name:
+        description: The gem spinel-compat probes from this checkout
+        type: string
+        required: true
+      ruby-version:
+        description: Ruby for the probes
+        type: string
+        default: "4.0"
+      paths:
+        description: Paths rubocop_spinel inspects (space-separated)
+        type: string
+        default: lib
+      roundhouse-app:
+        description: A Rails app directory for `roundhouse check` (empty skips it)
+        type: string
+        default: ""
+      roundhouse-version:
+        description: The rubys/roundhouse release to install
+        type: string
+        default: v2026.9.18
+      artifact-name:
+        description: Name of the uploaded reports artifact
+        type: string
+        default: conformance-probes
+      working-directory:
+        description: Directory holding the gem's Gemfile
+        type: string
+        default: .
+
+permissions:
+  contents: read
+
+jobs:
+  probes:
+    name: Compiler probes (report-only)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: ${{ inputs.ruby-version }}
+          bundler-cache: true
+          working-directory: ${{ inputs.working-directory }}
+      - run: mkdir -p conformance-probes
+
+      - name: "Probe: rubocop_spinel"
+        continue-on-error: true
+        env:
+          PATHS: ${{ inputs.paths }}
+        run: |
+          gem install rubocop_spinel --version 0.2.0 --no-document
+          kit=$(bundle exec ruby -e 'print Gem.loaded_specs.fetch("conformance-kit").full_gem_path')
+          # shellcheck disable=SC2086 # PATHS is a space-separated list
+          rubocop --config "$kit/config/rubocop_spinel.yml" --format json --out conformance-probes/rubocop_spinel.json \
+            --format progress $PATHS | tee conformance-probes/rubocop_spinel.txt
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/spinel
+          key: spinel-engine-${{ runner.os }}-bundler-spinel-0.4.0
+
+      - name: "Probe: spinel-compat"
+        continue-on-error: true
+        env:
+          GEM_NAME: ${{ inputs.gem-name }}
+        run: |
+          gem install bundler-spinel --version 0.4.0 --no-document
+          spinel-compat install-engine 2>&1 | tail -n 20 | tee conformance-probes/spinel-engine.txt
+          spinel-compat probe "$GEM_NAME" --dir . 2>&1 | tee conformance-probes/spinel-probe.txt
+
+      - name: "Probe: roundhouse check"
+        if: inputs.roundhouse-app != ''
+        continue-on-error: true
+        env:
+          APP: ${{ inputs.roundhouse-app }}
+          ROUNDHOUSE_VERSION: ${{ inputs.roundhouse-version }}
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            "https://github.com/rubys/roundhouse/releases/download/$ROUNDHOUSE_VERSION/roundhouse-installer.sh" | sh
+          export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+          roundhouse check --continue "$APP" 2>&1 | tee conformance-probes/roundhouse.txt
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Compiler probes (report-only)"
+            for report in conformance-probes/*.txt; do
+              [ -f "$report" ] || continue
+              echo "### $(basename "$report" .txt)"
+              echo '```'
+              tail -n 40 "$report"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.working-directory }}/conformance-probes
+          if-no-files-found: warn
