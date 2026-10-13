@@ -27,6 +27,15 @@ module ConformanceKit
     def findings = partitioned.first
     def allowlisted = partitioned.last
 
+    def modules_audited = audited_modules.size
+
+    # Constants declared with `autoload` but never loaded: not audited.
+    def skipped_autoloads
+      audited_modules.flat_map do |mod, name|
+        mod.constants(false).select { mod.autoload?(_1) }.map { "#{name}::#{_1}" }
+      end
+    end
+
     # Allowlisted names inside the audited namespaces that no longer turn up.
     def stale
       found = scan.map(&:name)
@@ -45,7 +54,7 @@ module ConformanceKit
     end
 
     def audited_modules
-      ObjectSpace.each_object(Module).filter_map do |mod|
+      @audited_modules ||= ObjectSpace.each_object(Module).filter_map do |mod|
         next if mod.singleton_class?
 
         name = ::Module.instance_method(:name).bind_call(mod) # a class may override .name

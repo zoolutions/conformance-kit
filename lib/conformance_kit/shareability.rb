@@ -23,9 +23,12 @@ module ConformanceKit
 
       def find(value, path, seen, depth)
         return nil if ::Ractor.shareable?(value) || seen.key?(value.__id__)
-        return blame(value, path) if leaf?(value) || depth >= MAX_DEPTH
+        return blame(value, path) if intrinsic?(value) || depth >= MAX_DEPTH
 
         seen[value.__id__] = true
+        # Freezing an unfrozen container would not fix a lock or a Proc inside it.
+        return intrinsic_below(value, path, seen, depth) || blame(value, path) unless value.frozen?
+
         children(value).each do |child_path, child|
           found = find(child, path + child_path, seen, depth + 1)
           return found if found
@@ -33,19 +36,37 @@ module ConformanceKit
         blame(value, path)
       end
 
-      def leaf?(value)
-        callable?(value) || lock?(value) || concurrent?(value) || !value.frozen?
+      def intrinsic?(value) = callable?(value) || lock?(value) || concurrent?(value)
+
+      # The first never-shareable object (lock, Proc, Concurrent::*) under value.
+      def intrinsic_below(value, path, seen, depth)
+        return nil if depth >= MAX_DEPTH
+
+        children(value).each do |child_path, child|
+          next if ::Ractor.shareable?(child) || seen.key?(child.__id__)
+          return blame(child, path + child_path) if intrinsic?(child)
+
+          seen[child.__id__] = true
+          found = intrinsic_below(child, path + child_path, seen, depth + 1)
+          return found if found
+        end
+        nil
       end
 
       def children(value)
         pairs = value.instance_variables.map { |ivar| [".#{ivar}", value.instance_variable_get(ivar)] }
         case value
-        when ::Hash then pairs + value.flat_map { |k, v| [["{key #{k.inspect}}", k], ["[#{k.inspect}]", v]] }
+        when ::Hash then pairs + hash_children(value)
         when ::Array then pairs + value.each_with_index.map { |v, i| ["[#{i}]", v] }
         when ::Struct, ::Data then pairs + value.to_h.map { |k, v| [".#{k}", v] }
         when ::Range then pairs + [[".begin", value.begin], [".end", value.end]]
         else pairs
         end
+      end
+
+      def hash_children(hash)
+        pairs = hash.flat_map { |k, v| [["{key #{k.inspect}}", k], ["[#{k.inspect}]", v]] }
+        hash.default_proc ? pairs + [[".default_proc", hash.default_proc]] : pairs
       end
 
       def blame(value, path)

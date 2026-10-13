@@ -35,6 +35,14 @@ RSpec.describe ConformanceKit::Audit do
       expect(findings.keys).not_to include("AuditFixture::Hooks", "AuditFixture::Registry")
     end
 
+    it "counts unloaded autoload constants it skipped" do
+      AuditFixture::Hooks.autoload(:Lazy, "/nonexistent/audit_fixture_lazy")
+
+      expect(audit.skipped_autoloads).to eq(["AuditFixture::Hooks::Lazy"])
+    ensure
+      AuditFixture::Hooks.send(:remove_const, :Lazy)
+    end
+
     it "stays inside the namespace" do
       expect(audit(namespaces: ["AuditFixture::Hooks"]).findings.map(&:name)).to eq(["AuditFixture::Hooks.@on_save"])
     end
@@ -109,6 +117,17 @@ RSpec.describe ConformanceKit::Audit do
     it "exits 2 on a namespace that is not defined" do
       expect(run_cli("--require", fixture, "--namespace", "NoSuchFixture")).to eq(2)
       expect(err.string).to include("NoSuchFixture")
+    end
+
+    it "exits 2 on a namespace that is not a module" do
+      expect(run_cli("--require", fixture, "--namespace", "AuditFixture::NAMES")).to eq(2)
+      expect(err.string).to include("AuditFixture::NAMES", "not a module")
+    end
+
+    it "reports how many modules it audited and how many autoloads it skipped" do
+      run_cli("--require", fixture, "--namespace", "AuditFixture", "--allowlist", File::NULL)
+
+      expect(out.string).to include("3 modules audited", "0 unloaded autoloads skipped")
     end
 
     it "exits 2 on a missing --allowlist file" do

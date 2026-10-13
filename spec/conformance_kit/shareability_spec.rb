@@ -33,6 +33,20 @@ RSpec.describe ConformanceKit::Shareability do
     expect(described_class.culprit(proc { 1 }.freeze).reason).to include("Proc", "Ractor.shareable_proc")
   end
 
+  it "blames a lock inside an unfrozen container, not the container" do
+    culprit = described_class.culprit({ lock: Mutex.new })
+
+    expect(culprit.path).to eq("[:lock]")
+    expect(culprit.object_class).to eq("Thread::Mutex")
+  end
+
+  it "names a frozen Hash's default_proc" do
+    culprit = described_class.culprit(Hash.new { |h, k| h[k] = [] }.freeze)
+
+    expect(culprit.path).to eq(".default_proc")
+    expect(culprit.object_class).to eq("Proc")
+  end
+
   it "names an UnboundMethod as never shareable" do
     expect(described_class.culprit(Module.instance_method(:name).freeze).reason).to include("UnboundMethod",
                                                                                             "never shareable")

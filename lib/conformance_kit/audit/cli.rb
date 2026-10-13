@@ -24,10 +24,10 @@ module ConformanceKit
         return unavailable unless defined?(::Ractor)
 
         options[:requires].each { require File.expand_path(_1) }
-        options[:namespaces].each { Object.const_get(_1) }
+        options[:namespaces].each { check_namespace(_1) }
         audit = Audit.new(namespaces: options[:namespaces], allowlist: allowlist(options[:allowlist]))
         report(audit, options[:strict])
-      rescue OptionParser::ParseError, AllowlistError, LoadError, NameError => e
+      rescue OptionParser::ParseError, AllowlistError, LoadError, NameError, ArgumentError => e
         @err.puts "conformance-audit: #{e.message}"
         USAGE_ERROR
       end
@@ -54,6 +54,11 @@ module ConformanceKit
         end
       end
 
+      def check_namespace(name)
+        value = Object.const_get(name)
+        raise ArgumentError, "--namespace #{name} is a #{value.class}, not a module" unless value.is_a?(Module)
+      end
+
       def allowlist(path)
         return Allowlist.load(path) if path
         return Allowlist.load(DEFAULT_ALLOWLIST) if File.exist?(DEFAULT_ALLOWLIST)
@@ -72,10 +77,12 @@ module ConformanceKit
         findings = audit.findings
         allowlisted = audit.allowlisted
         @out.puts "conformance-audit: #{findings.size} findings in #{audit.namespaces.join(', ')} " \
-                  "(#{allowlisted.size} allowlisted main-only)"
+                  "(#{allowlisted.size} allowlisted main-only; #{audit.modules_audited} modules audited, " \
+                  "#{audit.skipped_autoloads.size} unloaded autoloads skipped)"
         findings.each { @out.puts "  #{_1}" }
         section("allowlisted main-only:", allowlisted.map { "#{_1.name} — #{audit.allowlist.reason_for(_1.name)}" })
         section("stale allowlist entries (no longer found):", audit.stale)
+        section("unloaded autoloads, not audited (require or eager-load them):", audit.skipped_autoloads)
         return 0 if findings.empty?
         return 1 if strict
 

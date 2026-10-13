@@ -17,7 +17,7 @@ Background, the finalize-at-boot pattern and the settled decisions: [zoolutions/
 # Gemfile
 group :development, :test do
   gem "conformance-kit", github: "zoolutions/conformance-kit"
-  gem "rubocop-thread_safety", require: false # for config/rubocop.yml
+  gem "rubocop-thread_safety", ">= 0.8", require: false # for config/rubocop.yml
   gem "async", require: false                 # optional: runs the fiber example
 end
 ```
@@ -103,21 +103,24 @@ On Ruby 3.4+ this is `Ractor.store_if_absent` (atomic, one value per Ractor). Be
 bundle exec conformance-audit --require ./lib/my_gem --namespace MyGem --strict
 ```
 
-Requires the files, walks every loaded module under the namespaces (`--require` and `--namespace` repeat), and reports each constant and class/module instance variable whose value is not `Ractor.shareable?`, with the path to the offending object and the fix:
+Requires the files, walks every loaded module under the namespaces (`--require` and `--namespace` repeat), and reports each public constant and class/module instance variable whose value is not `Ractor.shareable?`, with the path to the offending object and the fix:
 
 ```
-conformance-audit: 2 findings in MyGem (1 allowlisted main-only)
+conformance-audit: 2 findings in MyGem (1 allowlisted main-only; 14 modules audited, 0 unloaded autoloads skipped)
   MyGem::LOCK (constant) Thread::Mutex: a Thread::Mutex is main-only: keep per-Ractor state in ConformanceKit::Store, or allowlist it main_only
   MyGem::Config.@colors (module ivar) Hash: [:primary] is an Array that is not frozen: freeze it at boot (Ractor.make_shareable)
 ```
 
-Unloaded autoload constants are skipped: require (or eager-load) everything the audit should see.
+Limits, so a green run means what it says:
+
+- Unloaded autoload constants are skipped and listed, never loaded mid-walk: require (or eager-load) everything the audit should see. The header counts the modules audited and the autoloads skipped.
+- `private_constant`s are invisible to it (Ruby has no public way to enumerate them). `config/rubocop.yml` and the boot-finalized example are the gates for those.
 
 | Exit | Meaning |
 |---|---|
 | 0 | no unallowlisted findings; or findings without `--strict` (report only); or no `Ractor` on this engine |
 | 1 | unallowlisted findings under `--strict` |
-| 2 | usage error, a namespace that is not defined, a file that cannot be required, or an invalid allowlist |
+| 2 | usage error, a namespace that is not defined or not a module, a file that cannot be required, or an invalid allowlist |
 
 ### `.conformance.yml`
 
@@ -141,7 +144,7 @@ inherit_gem:
   conformance-kit: config/rubocop.yml
 ```
 
-Turns on the six `rubocop-thread_safety` cops (`ClassAndModuleAttributes`, `ClassInstanceVariable`, `MutableClassInstanceVariable` with `EnforcedStyle: literals`, `NewThread`, `DirChdir`, `RackMiddlewareInstanceVariable`) plus `LazySynchronizationPrimitive`. Exclude a file or line only with a comment saying why it is safe.
+Turns on the six `rubocop-thread_safety` cops (`ClassAndModuleAttributes`, `ClassInstanceVariable`, `MutableClassInstanceVariable` with `EnforcedStyle: literals`, `NewThread`, `DirChdir`, `RackMiddlewareInstanceVariable`) plus `LazySynchronizationPrimitive` (which needs rubocop-thread_safety 0.8+). Exclude a file or line only with a comment saying why it is safe.
 
 `config/rubocop_spinel.yml` runs only `Spinel/Unsupported` (rubocop_spinel). It is for the report-only probe, never your lint: it flags `class << self`.
 
