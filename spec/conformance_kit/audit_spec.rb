@@ -122,9 +122,74 @@ RSpec.describe ConformanceKit::Audit do
       end
     end
 
-    it "exits 2 without --namespace" do
-      expect(run_cli("--require", fixture)).to eq(2)
-      expect(err.string).to include("--namespace")
+    it "exits 2 without --namespace and without audit.namespace, naming both" do
+      expect(run_cli("--require", fixture, "--allowlist", File::NULL)).to eq(2)
+      expect(err.string).to include("--namespace", ".conformance.yml audit.namespace")
+    end
+
+    describe "reading .conformance.yml" do
+      def project(name, file = ".conformance.yml") = File.expand_path("../fixtures/projects/#{name}/#{file}", __dir__)
+
+      it "audits audit.require and audit.namespace when no flags are given" do
+        expect(run_cli("--config", project("mutable"), "--strict")).to eq(1)
+        expect(out.string).to include("1 findings in MutableProject", "MutableProject::NAMES", "not frozen")
+      end
+
+      it "passes the conforming project" do
+        expect(run_cli("--config", project("clean"), "--strict")).to eq(0)
+        expect(out.string).to include("0 findings in CleanProject")
+      end
+
+      it "lets --require and --namespace override the config" do
+        expect(run_cli("--config", project("clean"), "--require", fixture, "--namespace", "AuditFixture")).to eq(0)
+        expect(out.string).to include("4 findings in AuditFixture")
+      end
+
+      it "fails --strict on an unloaded autoload under strict_autoloads: true, naming it" do
+        expect(run_cli("--config", project("autoload"), "--strict")).to eq(1)
+        expect(out.string).to include("0 findings", "AutoloadProject::Lazy", "audit.skip_autoloads")
+      end
+
+      it "only lists the unloaded autoload without strict_autoloads" do
+        expect(run_cli("--config", project("autoload", "lenient.yml"), "--strict")).to eq(0)
+        expect(out.string).to include("1 unloaded autoloads skipped", "AutoloadProject::Lazy")
+      end
+
+      it "reports an unloaded autoload without failing when --strict is off" do
+        expect(run_cli("--config", project("autoload"))).to eq(0)
+        expect(out.string).to include("AutoloadProject::Lazy", "--strict")
+      end
+
+      it "passes an autoload listed in audit.skip_autoloads, and lists stale entries" do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, ".conformance.yml")
+          File.write(path, <<~YAML)
+            audit:
+              require: [#{File.dirname(project('autoload'))}/lib/autoload_project]
+              namespace: [AutoloadProject]
+              strict_autoloads: true
+              skip_autoloads:
+                - name: AutoloadProject::Lazy
+                  reason: the fixture's optional extension
+                - name: AutoloadProject::Gone
+                  reason: removed
+          YAML
+
+          expect(run_cli("--config", path, "--strict")).to eq(0)
+          expect(out.string).to include("the fixture's optional extension", "stale audit.skip_autoloads",
+                                        "AutoloadProject::Gone")
+        end
+      end
+
+      it "exits 2 on an invalid config, naming the key" do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, ".conformance.yml")
+          File.write(path, "audit:\n  namespace: AuditFixture\n")
+
+          expect(run_cli("--config", path)).to eq(2)
+          expect(err.string).to include(path, "audit.namespace")
+        end
+      end
     end
 
     it "exits 2 on a namespace that is not defined" do
@@ -187,11 +252,11 @@ RSpec.describe ConformanceKit::Audit do
       expect([failing.exitstatus, passing.exitstatus]).to eq([1, 0])
     end
 
-    it "passes the kit's own audit with its .conformance.yml" do
-      requires = %w[audit rspec minitest].flat_map { ["--require", "./lib/conformance_kit/#{_1}"] }
-      out, _err, status = exe(*requires, "--namespace", "ConformanceKit", "--strict")
+    it "passes the kit's own audit from its .conformance.yml alone, nothing skipped" do
+      out, _err, status = exe("--strict")
 
       expect(status.exitstatus).to eq(0), out
+      expect(out).to include("in ConformanceKit", "0 unloaded autoloads skipped")
     end
   end
 end

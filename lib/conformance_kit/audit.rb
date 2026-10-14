@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "conformance_kit"
+require_relative "config"
 require_relative "audit/allowlist"
 require_relative "audit/cli"
 
@@ -8,7 +9,8 @@ module ConformanceKit
   # Walks every loaded module under the given namespaces and reports each
   # constant and class/module instance variable whose value is not
   # Ractor-shareable. Unloaded autoload constants are skipped: require (or
-  # eager-load) everything the audit should see.
+  # eager-load) everything the audit should see, and list deliberate exceptions
+  # in `skip_autoloads` (`audit.skip_autoloads:` in .conformance.yml).
   class Audit
     Finding = Data.define(:name, :kind, :value_class, :path, :reason) do
       def to_s
@@ -17,11 +19,12 @@ module ConformanceKit
       end
     end
 
-    attr_reader :namespaces, :allowlist
+    attr_reader :namespaces, :allowlist, :skip_autoloads
 
-    def initialize(namespaces:, allowlist: Allowlist.empty)
+    def initialize(namespaces:, allowlist: Allowlist.empty, skip_autoloads: Allowlist.empty)
       @namespaces = namespaces
       @allowlist = allowlist
+      @skip_autoloads = skip_autoloads
     end
 
     def findings = partitioned.first
@@ -31,15 +34,24 @@ module ConformanceKit
 
     # Constants declared with `autoload` but never loaded: not audited.
     def skipped_autoloads
-      audited_modules.flat_map do |mod, name|
+      @skipped_autoloads ||= audited_modules.flat_map do |mod, name|
         constants_of(mod).select { autoload?(mod, _1) }.map { "#{name}::#{_1}" }
       end
     end
+
+    # Skipped autoloads not listed in skip_autoloads: what strict_autoloads fails on.
+    def unexpected_autoloads = skipped_autoloads - @skip_autoloads.names
 
     # Allowlisted names inside the audited namespaces that no longer turn up.
     def stale
       found = scan.map(&:name)
       @allowlist.names.select { in_namespace?(_1) && !found.include?(_1) }
+    end
+
+    # skip_autoloads names inside the audited namespaces that are no longer unloaded autoloads.
+    def stale_skip_autoloads
+      skipped = skipped_autoloads
+      @skip_autoloads.names.select { in_namespace?(_1) && !skipped.include?(_1) }
     end
 
     private

@@ -1,136 +1,150 @@
 # frozen_string_literal: true
 
-require "json"
-require "open3"
-require "yaml"
+require "conformance_kit/config"
+require "tmpdir"
 
-RSpec.describe "config/ and the reusable workflows" do
-  let(:root) { File.expand_path("../..", __dir__) }
-
-  def load_yaml(path) = YAML.safe_load_file(File.join(root, path))
-
-  def rubocop(config, file)
-    out, err, = Open3.capture3("bundle", "exec", "rubocop", "--config", config, "--format", "json", file, chdir: root)
-    JSON.parse(out).fetch("files").flat_map { _1["offenses"] }.map { _1["cop_name"] }.uniq
-  rescue JSON::ParserError
-    raise "rubocop printed no JSON: #{err}"
-  end
-
-  describe "config/rubocop.yml" do
-    let(:config) { load_yaml("config/rubocop.yml") }
-    let(:six) do
-      %w[ClassAndModuleAttributes ClassInstanceVariable MutableClassInstanceVariable NewThread DirChdir
-         RackMiddlewareInstanceVariable].map { "ThreadSafety/#{_1}" }
-    end
-
-    it "loads rubocop-thread_safety and turns all six cops on" do
-      expect(config["plugins"]).to include("rubocop-thread_safety")
-      expect(six.map { config.dig(_1, "Enabled") }).to all(be(true))
-      expect(config.dig("ThreadSafety/MutableClassInstanceVariable", "EnforcedStyle")).to eq("literals")
-    end
-
-    it "flags the violating fixture" do
-      cops = rubocop("config/rubocop.yml", "spec/fixtures/rubocop/violating.rb")
-
-      expect(cops).to include("ThreadSafety/ClassInstanceVariable", "ThreadSafety/NewThread",
-                              "ThreadSafety/ClassAndModuleAttributes", "ThreadSafety/LazySynchronizationPrimitive")
-    end
-
-    it "passes the conforming fixture" do
-      expect(rubocop("config/rubocop.yml", "spec/fixtures/rubocop/conforming.rb").grep(/ThreadSafety/)).to be_empty
+RSpec.describe ConformanceKit::Config do
+  def with_config(yaml)
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, ".conformance.yml")
+      File.write(path, yaml)
+      yield path, dir
     end
   end
 
-  describe "config/rubocop_spinel.yml" do
-    it "runs only the Spinel cops" do
-      config = load_yaml("config/rubocop_spinel.yml")
+  def load_yaml(yaml) = with_config(yaml) { |path| described_class.load(path) }
 
-      expect(config["plugins"]).to eq(["rubocop_spinel"])
-      expect(config.dig("AllCops", "DisabledByDefault")).to be(true)
-      expect(config.dig("Spinel/Unsupported", "Enabled")).to be(true)
-    end
-
-    it "flags `class << self` and threads in the violating fixture, and nothing else" do
-      expect(rubocop("config/rubocop_spinel.yml", "spec/fixtures/rubocop/violating.rb")).to eq(["Spinel/Unsupported"])
+  def error_for(yaml)
+    with_config(yaml) do |path|
+      expect { described_class.load(path) }.to raise_error(ConformanceKit::ConfigError) { return _1.message }
     end
   end
 
-  shared_examples "a reusable workflow" do |path|
-    let(:workflow) { load_yaml(path) }
-    # Psych reads the bare `on:` key as the boolean true.
-    let(:inputs) { workflow.fetch(true).fetch("workflow_call").fetch("inputs") }
-    let(:steps) { workflow.fetch("jobs").values.flat_map { _1.fetch("steps") } }
+  describe ".load" do
+    it "reads every section of the 0.2 schema" do
+      config = load_yaml(<<~YAML)
+        audit:
+          require: [./lib/my_gem]
+          namespace: [MyGem]
+          strict_autoloads: true
+          skip_autoloads:
+            - name: MyGem::Optional
+              reason: only loads with pgbus present
+        ractor:
+          ruby: "4.0"
+          test_command: bundle exec rake test
+          env:
+            PGBUS_DATABASE_URL: postgres://localhost/pgbus_test
+          setup: bin/conformance-db-setup
+          working_directory: gem
+        probes:
+          gem_name: my_gem
+          paths: [lib, app]
+          roundhouse_app: spec/dummy
+        main_only:
+          - name: MyGem::LOCK
+            reason: main-only
+      YAML
 
-    it "is callable with workflow_call and read-only" do
-      expect(workflow.fetch(true).keys).to eq(["workflow_call"])
-      expect(workflow.fetch("permissions")).to eq("contents" => "read")
+      expect(config["audit.namespace"]).to eq(["MyGem"])
+      expect(config.strict_autoloads?).to be(true)
+      expect(config.skip_autoloads.reason_for("MyGem::Optional")).to eq("only loads with pgbus present")
+      expect(config["ractor.test_command"]).to eq("bundle exec rake test")
+      expect(config["ractor.env"]).to eq("PGBUS_DATABASE_URL" => "postgres://localhost/pgbus_test")
+      expect(config["ractor.setup"]).to eq("bin/conformance-db-setup")
+      expect(config["probes.paths"]).to eq(%w[lib app])
+      expect(config.allowlist.names).to eq(["MyGem::LOCK"])
     end
 
-    it "pins every action by SHA" do
-      expect(steps.filter_map { _1["uses"] }).to all(match(/@[0-9a-f]{40}\z/))
+    it "fills the defaults" do
+      config = load_yaml("audit:\n  namespace: [MyGem]\n")
+
+      expect(config["ractor.ruby"]).to eq("4.0")
+      expect(config["ractor.test_command"]).to eq("bundle exec rspec --tag ractor")
+      expect(config["ractor.working_directory"]).to eq(".")
+      expect(config["ractor.env"]).to eq({})
+      expect(config["probes.paths"]).to eq(["lib"])
+      expect(config["audit.require"]).to eq([])
+      expect(config.strict_autoloads?).to be(false)
+      expect(config["probes.gem_name"]).to be_nil
     end
 
-    it "never interpolates an input into a run: script" do
-      expect(steps.filter_map { _1["run"] }.grep(/\$\{\{/)).to be_empty
+    it "resolves audit.require against the file's directory" do
+      with_config("audit:\n  require: [./lib/my_gem]\n") do |path, dir|
+        expect(described_class.load(path).audit_requires).to eq([File.join(dir, "lib/my_gem")])
+      end
+    end
+
+    it "keeps a 0.1 file with only main_only: valid" do
+      expect(load_yaml("main_only:\n  - name: MyGem::LOCK\n    reason: main-only\n").allowlist.names)
+        .to eq(["MyGem::LOCK"])
+    end
+
+    it "is empty for a missing file" do
+      config = described_class.load(File.join(Dir.tmpdir, "no-such-dir", ".conformance.yml"))
+
+      expect(config.exists?).to be(false)
+      expect(config["audit.namespace"]).to eq([])
+      expect(config.allowlist.names).to eq([])
+    end
+
+    it "is empty for an empty file" do
+      expect(load_yaml("").exists?).to be(true)
     end
   end
 
-  describe ".github/workflows/ractor.yml" do
-    it_behaves_like "a reusable workflow", ".github/workflows/ractor.yml"
-
-    let(:workflow) { load_yaml(".github/workflows/ractor.yml") }
-    let(:inputs) { workflow.fetch(true).fetch("workflow_call").fetch("inputs") }
-
-    it "takes the audit target and defaults to Ruby 4.0 and the :ractor tag" do
-      expect(inputs.keys).to contain_exactly("ruby-version", "require", "namespace", "allowlist", "test-command",
-                                             "audit", "working-directory")
-      expect(inputs.slice("require", "namespace").values.map { _1["required"] }).to all(be(true))
-      expect(inputs.dig("ruby-version", "default")).to eq("4.0")
-      expect(inputs.dig("test-command", "default")).to eq("bundle exec rspec --tag ractor")
+  describe "validation" do
+    it "rejects an unknown top-level key, naming the file and the key" do
+      with_config("audits:\n  namespace: [MyGem]\n") do |path|
+        expect { described_class.load(path) }.to raise_error(ConformanceKit::ConfigError, /#{path}.*audits/)
+      end
     end
 
-    it "runs conformance-audit --strict" do
-      runs = workflow.fetch("jobs").values.flat_map { _1["steps"] }.filter_map { _1["run"] }.join("\n")
+    it "rejects an unknown key inside a section" do
+      expect(error_for("ractor:\n  rubby: '4.0'\n")).to include("ractor.rubby")
+    end
 
-      expect(runs).to include("conformance-audit", "--strict")
+    it "rejects a string where a list is expected" do
+      expect(error_for("audit:\n  namespace: MyGem\n")).to include("audit.namespace", "list")
+    end
+
+    it "rejects a number where a string is expected" do
+      expect(error_for("ractor:\n  ruby: 4.0\n")).to include("ractor.ruby", "string", "Float")
+    end
+
+    it "rejects a non-boolean strict_autoloads" do
+      expect(error_for("audit:\n  strict_autoloads: maybe\n")).to include("audit.strict_autoloads", "true or false")
+    end
+
+    it "rejects an env value that is not a string" do
+      expect(error_for("ractor:\n  env:\n    PORT: 5432\n")).to include("ractor.env", "PORT")
+    end
+
+    it "rejects a section that is not a mapping" do
+      expect(error_for("audit: [MyGem]\n")).to include("audit", "mapping")
+    end
+
+    it "rejects a skip_autoloads entry without a reason" do
+      expect(error_for("audit:\n  skip_autoloads:\n    - name: MyGem::Optional\n"))
+        .to include("MyGem::Optional", "reason")
+    end
+
+    it "rejects a main_only entry without a reason" do
+      expect(error_for("main_only:\n  - name: MyGem::LOCK\n")).to include("MyGem::LOCK", "reason")
+    end
+
+    it "rejects YAML that safe_load refuses" do
+      expect(error_for("audit: &a\n  namespace: [X]\nprobes: *a\n")).to include(".conformance.yml")
+    end
+
+    it "rejects a document that is not a mapping" do
+      expect(error_for("- MyGem\n")).to include("mapping")
     end
   end
 
-  describe ".github/workflows/probes.yml" do
-    it_behaves_like "a reusable workflow", ".github/workflows/probes.yml"
-
-    let(:workflow) { load_yaml(".github/workflows/probes.yml") }
-    let(:inputs) { workflow.fetch(true).fetch("workflow_call").fetch("inputs") }
-    let(:steps) { workflow.fetch("jobs").values.flat_map { _1.fetch("steps") } }
-
-    it "takes the gem and the optional roundhouse app" do
-      expect(inputs.keys).to contain_exactly("gem-name", "ruby-version", "paths", "roundhouse-app",
-                                             "roundhouse-version", "roundhouse-sha256", "artifact-name",
-                                             "working-directory")
-      expect(inputs.dig("gem-name", "required")).to be(true)
-      expect(inputs.dig("roundhouse-app", "default")).to eq("")
-    end
-
-    it "never fails the build: every probe step continues on error" do
-      probes = steps.select { _1["name"].to_s.start_with?("Probe:") }
-
-      expect(probes.map { _1["name"] }).to contain_exactly("Probe: rubocop_spinel", "Probe: spinel-compat",
-                                                           "Probe: roundhouse check")
-      expect(probes.map { _1["continue-on-error"] }).to all(be(true))
-    end
-
-    it "checks the roundhouse binary against a pinned digest, never piping an installer to sh" do
-      script = steps.find { _1["name"] == "Probe: roundhouse check" }.fetch("run")
-
-      expect(inputs.dig("roundhouse-sha256", "default")).to match(/\A\h{64}\z/)
-      expect(script).to include("sha256sum --check")
-      expect(script).not_to match(/\|\s*sh\b/)
-    end
-
-    it "uploads the reports as an artifact even when a probe failed" do
-      upload = steps.find { _1["uses"].to_s.start_with?("actions/upload-artifact@") }
-
-      expect(upload["if"]).to eq("always()")
+  describe "#[]" do
+    it "raises on an unknown key" do
+      expect { load_yaml("")["audit.nope"] }.to raise_error(ConformanceKit::ConfigError, /audit\.nope/)
     end
   end
 end
