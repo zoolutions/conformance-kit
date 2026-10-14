@@ -1,5 +1,6 @@
-plugins:
-  - rubocop-thread_safety
+# The kit lints itself with the Tier 1 config it ships (and `conformance-kit doctor` checks for).
+inherit_gem:
+  conformance-kit: config/rubocop.yml
 
 AllCops:
   TargetRubyVersion: 3.2
@@ -12,6 +13,8 @@ AllCops:
     - "rakelib/release.rake"
     - "bin/release"
     - "bin/labels"
+    # Consumer-shaped fixture projects: their .rubocop.yml is the one doctor checks for, not this repo's lint.
+    - "spec/fixtures/projects/**/*"
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes

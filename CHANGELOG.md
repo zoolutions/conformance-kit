@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
+
+Breaking (pre-1.0): the reusable workflows `ractor.yml` and `probes.yml` are replaced by `conformance.yml`, which an org ruleset requires at a release tag. A repo opts in with `.conformance.yml`, `gem "conformance-kit", "~> 0.2"` and `gem "rubocop-thread_safety", ">= 0.8"` in its Gemfile, and `inherit_gem: { conformance-kit: config/rubocop.yml }` in `.rubocop.yml` (`conformance-kit doctor` checks all three); it needs no workflow edits.
+
+- `.conformance.yml` 0.2 schema: `audit:` (`require`, `namespace`, `strict_autoloads`, `skip_autoloads`), `ractor:` (`ruby`, `test_command`, `env`, `setup`, `working_directory`), `probes:` (`gem_name`, `paths`, `roundhouse_app`) and the unchanged `main_only:`. Every key is validated; an unknown key or a wrong type exits 2.
+- `conformance-kit` executable: `check` (doctor, `ractor.setup`, `ractor.test_command`, then `conformance-audit --strict`), `doctor [--expect X.Y]` and `config KEY`.
+- `conformance-audit` reads `audit.require` and `audit.namespace` when no flags are given (flags still override); `--config` is the new name for `--allowlist`.
+- `audit.strict_autoloads: true` makes `--strict` fail on unloaded autoloads not listed in `audit.skip_autoloads` (default `false`, 0.1's behaviour).
+- `.github/workflows/conformance.yml`: the Ruby 4.0 conformance job (with a `postgres:18` service and the version handshake from `github.workflow_ref`) and the report-only compiler probes.
+
+## 0.1.0
 
 - Shared examples (`require "conformance_kit/rspec"`): `"thread-safe under contention"`, `"fiber-safe under an Async reactor"`, `"a boot-finalized configuration"` and `"runs inside a non-main Ractor"` (Ruby 4.0+, tagged `:ractor`).
 - The same checks as Minitest assertions (`require "conformance_kit/minitest"`): `assert_thread_safe`, `assert_fiber_safe`, `assert_boot_finalized`, `assert_runs_in_ractor`.

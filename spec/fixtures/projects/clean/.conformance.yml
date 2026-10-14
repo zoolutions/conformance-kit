@@ -1,0 +1,6 @@
+audit:
+  require: [./lib/clean_project]
+  namespace: [CleanProject]
+  strict_autoloads: true
+ractor:
+  test_command: "true"

@@ -1,0 +1,6 @@
+# The autoload fixture without strict_autoloads: the skipped autoload is listed, not failed.
+audit:
+  require: [./lib/autoload_project]
+  namespace: [AutoloadProject]
+ractor:
+  test_command: "true"

@@ -39,15 +39,3 @@ jobs:
           bundler-cache: true
       - run: bundle exec rubocop
 
-  # The kit calls its own reusable workflows, so a consumer never meets a
-  # broken one first.
-  ractor:
-    uses: ./.github/workflows/ractor.yml
-    with:
-      require: ./lib/conformance_kit/audit ./lib/conformance_kit/rspec ./lib/conformance_kit/minitest
-      namespace: ConformanceKit
-
-  probes:
-    uses: ./.github/workflows/probes.yml
-    with:
-      gem-name: conformance-kit
