@@ -1,0 +1,27 @@
+spec/conformance_kit/config_spec.rb
+  s_0ac168ea29ecb8::t_444f45495addf4 73-74
+  s_0ac168ea29ecb8::t_17eadece27c193 72,75-83
+config/rubocop_spinel.yml
+  s_0ac168ea29ecb8::t_f5f05c88a8b3da 2
+.claude/commands/review-pr.md
+  s_0ac168ea29ecb8::t_f5f05c88a8b3da 46
+lib/conformance_kit/config.rb
+  s_0ac168ea29ecb8::t_ac823b7166e506 68,103,132
+  s_0ac168ea29ecb8::t_921b1ce5b9c50b 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "92e69b148a69bb2718e8ad66a872128e6fb8c388",
+  "prompts": {},
+  "sessions": {
+    "s_0ac168ea29ecb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5b4ca5b-1f04-4f63-b577-3bf143a5a8be",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
