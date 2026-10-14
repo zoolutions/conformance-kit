@@ -1,5 +1,5 @@
 # conformance-kit's report-only Spinel probe (Tier 4): only the Spinel cops,
-# never a gate. Run by .github/workflows/probes.yml as
+# never a gate. Run by the probes job of .github/workflows/conformance.yml as
 #
 #   rubocop --config <conformance-kit>/config/rubocop_spinel.yml lib
 #

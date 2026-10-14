@@ -69,6 +69,18 @@ RSpec.describe ConformanceKit::Config do
       expect(config["probes.gem_name"]).to be_nil
     end
 
+    it "reads a key left blank as unset, so its default applies (as the workflow's yq read does)" do
+      config = load_yaml("audit:\n  namespace:\n  require:\nractor:\n  ruby:\n  env:\n  working_directory:\n  " \
+                         "test_command:\n")
+
+      expect(config["audit.namespace"]).to eq([])
+      expect(config["audit.require"]).to eq([])
+      expect(config["ractor.ruby"]).to eq("4.0")
+      expect(config["ractor.env"]).to eq({})
+      expect(config["ractor.working_directory"]).to eq(".")
+      expect(config["ractor.test_command"]).to eq("bundle exec rspec --tag ractor")
+    end
+
     it "resolves audit.require against the file's directory" do
       with_config("audit:\n  require: [./lib/my_gem]\n") do |path, dir|
         expect(described_class.load(path).audit_requires).to eq([File.join(dir, "lib/my_gem")])

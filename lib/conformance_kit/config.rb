@@ -65,7 +65,8 @@ module ConformanceKit
       @exists = exists
       raise ConfigError, "#{source}: expected a mapping (audit:, ractor:, probes:, main_only:)" unless data.is_a?(Hash)
 
-      @values = flatten(data).to_h { |key, value| [key, validate(key, value)] }
+      # A key left blank is unset: its default applies, as in the workflow's yq read.
+      @values = flatten(data).to_h.compact.to_h { |key, value| [key, validate(key, value)] }
       @allowlist = entries("main_only")
       @skip_autoloads = entries("audit.skip_autoloads")
     end
@@ -99,7 +100,7 @@ module ConformanceKit
 
     def validate(key, value)
       type = TYPES.fetch(key) { unknown_key!(key, TYPES.keys) }
-      return value if value.nil? || valid?(type, value)
+      return value if valid?(type, value)
 
       raise ConfigError, "#{source}: #{key} must be #{EXPECTED.fetch(type)}, got #{value.class} #{value.inspect}"
     end
@@ -128,7 +129,7 @@ module ConformanceKit
     end
 
     def entries(key)
-      Audit::Allowlist.new(self[key] || [], source: source, key: key)
+      Audit::Allowlist.new(self[key], source: source, key: key)
     rescue Audit::AllowlistError => e
       raise ConfigError, e.message
     end
