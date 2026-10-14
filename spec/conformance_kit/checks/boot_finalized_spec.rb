@@ -48,8 +48,7 @@ RSpec.describe ConformanceKit::Checks::BootFinalized do
   end
 
   it "skips with a reason without Ractor" do
-    hide_const("Ractor")
-    result = described_class.call(readers: [-> { 1 }])
+    result = without_ractor { described_class.call(readers: [-> { 1 }]) }
 
     expect(result).to be_skipped
     expect(result.message).to include("Ractor")

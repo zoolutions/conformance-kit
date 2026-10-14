@@ -241,9 +241,9 @@ RSpec.describe ConformanceKit::Audit do
     end
 
     it "reports and exits 0 on an engine without Ractor" do
-      hide_const("Ractor")
+      status = without_ractor { run_cli("--namespace", "AuditFixture", "--strict") }
 
-      expect(run_cli("--namespace", "AuditFixture", "--strict")).to eq(0)
+      expect(status).to eq(0)
       expect(out.string).to include("Ractor is unavailable")
     end
   end
