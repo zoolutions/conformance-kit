@@ -178,10 +178,34 @@ Conformance is enforced by **one workflow in this repo**, `.github/workflows/con
 2. the Gemfile lines (`conformance-kit ~> 0.2`, `rubocop-thread_safety >= 0.8`),
 3. `inherit_gem: { conformance-kit: config/rubocop.yml }` in `.rubocop.yml`.
 
+The org ruleset, `conformance`, targets the default branch of every repo whose `conformance` custom property is `enforced`. A repo is flipped once its `bundle exec conformance-kit check` is green on Ruby 4.0:
+
+```bash
+gh api -X PATCH repos/zoolutions/<repo>/properties/values \
+  -f 'properties[][property_name]=conformance' -f 'properties[][value]=enforced'
+```
+
+The required workflow is itself the merge gate: its checks are not added to a repo's `required_status_checks`.
+
 The workflow runs on `pull_request` and `merge_group`, with two jobs:
 
 - **Conformance (Ruby `ractor.ruby`)**, the gate: the version handshake, then `bundle exec conformance-kit check`. A `postgres:18` service (user and password `postgres`, port 5432) is always up; the workflow exports nothing, so `ractor.env` and `ractor.setup` wire it.
 - **Compiler probes (report-only)**: `rubocop_spinel` (gem-installed in the probe, never in your Gemfile), `spinel-compat probe <probes.gem_name> --dir .` and, when `probes.roundhouse_app` is set, `roundhouse check` (the release tarball, checked against a pinned SHA-256). Every probe continues on error; the reports go to the run summary and a `conformance-probes` artifact. It never fails a build, and it skips with a notice when `probes.gem_name` is unset.
+
+### After a release: bump the ruleset `ref`
+
+The ruleset pins `conformance.yml` to a release tag, never a branch. When a release changes `.github/workflows/conformance.yml` (its notes say so), point the ruleset at the new tag once `bin/release` has pushed it:
+
+```bash
+tag=refs/tags/vX.Y.Z
+id=$(gh api orgs/zoolutions/rulesets --jq '.[] | select(.name == "conformance") | .id')
+gh api "orgs/zoolutions/rulesets/$id" \
+  | jq --arg ref "$tag" '{rules: [.rules[] | if .type == "workflows" then .parameters.workflows |= map(.ref = $ref) else . end]}' \
+  | gh api -X PUT "orgs/zoolutions/rulesets/$id" --input -
+gh api "orgs/zoolutions/rulesets/$id" --jq '.enforcement, .rules[].parameters.workflows[]?.ref'
+```
+
+The `PUT` replaces the whole `rules` array, so it is rebuilt from the current ruleset rather than typed by hand. A release that leaves `conformance.yml` untouched needs no bump. After a minor or major bump, a consumer still resolving an older `conformance-kit` fails the version handshake until it moves to `~> X.Y`.
 
 ### `conformance-kit check`, the local equivalent
 
