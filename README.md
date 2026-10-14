@@ -16,7 +16,7 @@ Background, the finalize-at-boot pattern and the settled decisions: [zoolutions/
 ```ruby
 # Gemfile
 group :development, :test do
-  gem "conformance-kit", github: "zoolutions/conformance-kit"
+  gem "conformance-kit", "~> 0.1", require: false
   gem "rubocop-thread_safety", ">= 0.8", require: false # for config/rubocop.yml
   gem "async", require: false                 # optional: runs the fiber example
 end
