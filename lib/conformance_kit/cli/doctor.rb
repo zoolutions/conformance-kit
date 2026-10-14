@@ -60,8 +60,8 @@ module ConformanceKit
       end
 
       def inherits_kit?(rubocop)
-        files = rubocop.is_a?(Hash) && rubocop.dig("inherit_gem", "conformance-kit")
-        Array(files).include?(RUBOCOP_CONFIG)
+        gems = rubocop.is_a?(Hash) && rubocop["inherit_gem"]
+        gems.is_a?(Hash) && Array(gems["conformance-kit"]).include?(RUBOCOP_CONFIG)
       end
 
       def thread_safety_problem

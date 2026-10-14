@@ -41,7 +41,7 @@ jobs:
             echo "::error file=$CONFORMANCE_CONFIG::ractor.ruby must be a version like \"4.0\", got: $ruby"
             exit 1
           fi
-          if [[ ! "$dir" =~ ^[A-Za-z0-9._/-]+$ || "$dir" == *..* ]]; then
+          if [[ ! "$dir" =~ ^[A-Za-z0-9._/-]+$ || "$dir" == /* || "$dir" == *..* ]]; then
             echo "::error file=$CONFORMANCE_CONFIG::ractor.working_directory must be a path inside the repo, got: $dir"
             exit 1
           fi
@@ -109,6 +109,8 @@ jobs:
     name: Compiler probes (report-only)
     needs: settings
     runs-on: ubuntu-latest
+    # Report-only end to end: a setup, cache or upload failure never fails the workflow either.
+    continue-on-error: true
     env:
       ROUNDHOUSE_VERSION: v2026.9.18
       # SHA-256 of that release's x86_64-unknown-linux-musl tarball: change it with ROUNDHOUSE_VERSION.

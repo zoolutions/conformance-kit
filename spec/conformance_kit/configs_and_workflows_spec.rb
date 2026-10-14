@@ -108,6 +108,16 @@ RSpec.describe "config/ and the conformance workflow" do
                               "config probes.roundhouse_app")
     end
 
+    it "never fails the workflow from the probes job, even on a setup or upload failure" do
+      expect(jobs.fetch("probes")["continue-on-error"]).to be(true)
+    end
+
+    it "rejects an absolute or escaping working directory" do
+      script = jobs.fetch("settings").fetch("steps").filter_map { _1["run"] }.join
+
+      expect(script).to include('"$dir" == /*', '"$dir" == *..*')
+    end
+
     it "never fails the build from a probe: every probe step continues on error" do
       named = probes.select { _1["name"].to_s.start_with?("Probe:") }
 

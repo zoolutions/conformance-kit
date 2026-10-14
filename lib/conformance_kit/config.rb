@@ -52,8 +52,9 @@ module ConformanceKit
       root = File.dirname(File.expand_path(path))
       return new({}, source: path, root: root, exists: false) unless File.exist?(path)
 
-      new(YAML.safe_load_file(path) || {}, source: path, root: root, exists: true)
-    rescue Psych::Exception => e
+      data = YAML.safe_load_file(path)
+      new(data.nil? ? {} : data, source: path, root: root, exists: true)
+    rescue Psych::Exception, SystemCallError => e
       raise ConfigError, "#{path}: #{e.message}"
     end
 
@@ -65,8 +66,9 @@ module ConformanceKit
       @exists = exists
       raise ConfigError, "#{source}: expected a mapping (audit:, ractor:, probes:, main_only:)" unless data.is_a?(Hash)
 
+      pairs = flatten(data).each { |key, _| unknown_key!(key, TYPES.keys) unless TYPES.key?(key) }
       # A key left blank is unset: its default applies, as in the workflow's yq read.
-      @values = flatten(data).to_h.compact.to_h { |key, value| [key, validate(key, value)] }
+      @values = pairs.to_h.compact.to_h { |key, value| [key, normalize(key, validate(key, value))] }
       @allowlist = entries("main_only")
       @skip_autoloads = entries("audit.skip_autoloads")
     end
@@ -98,8 +100,13 @@ module ConformanceKit
       end
     end
 
+    # A namespace is matched by name: `::MyGem` is `MyGem`, as with --namespace.
+    def normalize(key, value)
+      key == "audit.namespace" ? value.map { _1.delete_prefix("::") } : value
+    end
+
     def validate(key, value)
-      type = TYPES.fetch(key) { unknown_key!(key, TYPES.keys) }
+      type = TYPES.fetch(key)
       return value if valid?(type, value)
 
       raise ConfigError, "#{source}: #{key} must be #{EXPECTED.fetch(type)}, got #{value.class} #{value.inspect}"

@@ -112,6 +112,24 @@ RSpec.describe ConformanceKit::Config do
       end
     end
 
+    it "rejects an unknown key left blank" do
+      expect(error_for("ractor:\n  rubby:\n")).to include("ractor.rubby")
+    end
+
+    it "rejects a document that is false" do
+      expect(error_for("false\n")).to include("mapping")
+    end
+
+    it "rejects a path that is a directory, as a config error" do
+      Dir.mktmpdir do |dir|
+        expect { described_class.load(dir) }.to raise_error(ConformanceKit::ConfigError, /#{dir}/)
+      end
+    end
+
+    it "strips a leading :: from audit.namespace" do
+      expect(load_yaml("audit:\n  namespace: ['::MyGem']\n")["audit.namespace"]).to eq(["MyGem"])
+    end
+
     it "rejects an unknown key inside a section" do
       expect(error_for("ractor:\n  rubby: '4.0'\n")).to include("ractor.rubby")
     end

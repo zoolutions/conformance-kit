@@ -68,6 +68,16 @@ RSpec.describe ConformanceKit::CLI do
       expect(err.string).to include("probes.gem")
     end
 
+    it "exits 2 on extra arguments after the key" do
+      expect(run_cli("config", "probes.gem_name", "typo", "--config", project("clean"))).to eq(2)
+      expect(err.string).to include("typo")
+    end
+
+    it "exits 2 on a --config that is a directory" do
+      expect(run_cli("config", "probes.gem_name", "--config", root)).to eq(2)
+      expect(err.string).to include(root)
+    end
+
     it "exits 2 without a key" do
       expect(run_cli("config")).to eq(2)
       expect(err.string).to include("KEY")
@@ -111,6 +121,13 @@ RSpec.describe ConformanceKit::CLI do
       with_project("audit:\n  namespace: [X]\n", rubocop: "plugins:\n  - rubocop-thread_safety\n") do |path|
         expect(doctor(path)).to eq(1)
         expect(out.string).to include(".rubocop.yml", "inherit_gem", "conformance-kit: config/rubocop.yml")
+      end
+    end
+
+    it "fails, not crashes, on a scalar inherit_gem" do
+      with_project("audit:\n  namespace: [X]\n", rubocop: "inherit_gem: conformance-kit\n") do |path|
+        expect(doctor(path)).to eq(1)
+        expect(out.string).to include("inherit_gem")
       end
     end
 

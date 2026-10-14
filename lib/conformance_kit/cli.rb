@@ -74,7 +74,10 @@ module ConformanceKit
     end
 
     def print_value(options)
-      key = options[:args].first or raise ArgumentError, "config needs a KEY (e.g. probes.gem_name)"
+      key, *extra = options[:args]
+      raise ArgumentError, "config needs a KEY (e.g. probes.gem_name)" unless key
+      raise ArgumentError, "config takes one KEY, got also: #{extra.join(' ')}" if extra.any?
+
       @out.puts format_value(config(options)[key])
       0
     end

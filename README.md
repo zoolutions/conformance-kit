@@ -115,7 +115,7 @@ conformance-audit: 2 findings in MyGem (1 allowlisted main-only; 14 modules audi
 
 Limits, so a green run means what it says:
 
-- Unloaded autoload constants are skipped and listed, never loaded mid-walk: require (or eager-load) everything the audit should see. The header counts the modules audited and the autoloads skipped. With `audit.strict_autoloads: true`, `--strict` also fails on every skipped autoload not listed in `audit.skip_autoloads`, so a green run means everything was audited.
+- Unloaded autoload constants are skipped and listed, never loaded mid-walk: require (or eager-load) everything the audit should see. The header counts the modules audited and the autoloads skipped. With `audit.strict_autoloads: true`, `--strict` also fails on every skipped autoload not listed in `audit.skip_autoloads`, so a green run means every autoload not deliberately skipped was audited.
 - `private_constant`s are invisible to it (Ruby has no public way to enumerate them). `config/rubocop.yml` and the boot-finalized example are the gates for those.
 
 | Exit | Meaning |
@@ -126,7 +126,7 @@ Limits, so a green run means what it says:
 
 ### `.conformance.yml`
 
-One file per repo says what it is held to. It is read from the working directory (or `--config PATH`; `--allowlist PATH` still works); paths in it are relative to it. Every key is validated: an unknown key or a wrong type is an error (exit 2) naming the file and the key.
+One file per repo says what it is held to. It is read from the working directory (or `--config PATH`; `--allowlist PATH` still works). `audit.require` and `ractor.working_directory` are relative to the file; `ractor.setup`, `ractor.test_command`, `probes.paths` and `probes.roundhouse_app` run in (or are relative to) `ractor.working_directory`. Every key is validated: an unknown key or a wrong type is an error (exit 2) naming the file and the key.
 
 ```yaml
 audit:
@@ -205,7 +205,7 @@ bundle exec conformance-kit config probes.gem_name
 
 ### The version handshake
 
-The behaviour a repo is held to comes from the `conformance-kit` in its lockfile; only the plumbing comes from the workflow tag. So a stale lockfile cannot pass a newer workflow vacuously, the workflow reads its own tag from `github.workflow_ref` and fails with "bump conformance-kit to ~> X.Y" when the repo resolves anything older than `X.Y`. The version is derived, never stored: a release bumps only the ruleset's `ref`. On a ref that is not a `refs/tags/v*` tag (this repo's own pull requests) the handshake is skipped with a notice.
+The behaviour a repo is held to comes from the `conformance-kit` in its lockfile; only the plumbing comes from the workflow tag. So a stale lockfile cannot pass a newer workflow vacuously, the workflow reads its own tag from `github.workflow_ref` and fails with "bump conformance-kit to ~> X.Y" when the repo resolves anything older than `X.Y`. The version is derived, never stored: a release bumps only the ruleset's `ref`. On a ref that is not a `refs/tags/v*` tag (this repo's own pull requests) the handshake is skipped with a notice. That `github.workflow_ref` carries the tag for a ruleset-required workflow is verified in the rollout pilot; until then, treat the handshake as pending validation.
 
 ## Development
 

@@ -135,6 +135,17 @@ RSpec.describe ConformanceKit::Audit do
         expect(out.string).to include("1 findings in MutableProject", "MutableProject::NAMES", "not frozen")
       end
 
+      it "audits an audit.namespace written with a leading ::" do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, ".conformance.yml")
+          File.write(path, "audit:\n  require: [#{File.dirname(project('mutable'))}/lib/mutable_project]\n  " \
+                           "namespace: ['::MutableProject']\n")
+
+          expect(run_cli("--config", path, "--strict")).to eq(1)
+          expect(out.string).to include("MutableProject::NAMES")
+        end
+      end
+
       it "passes the conforming project" do
         expect(run_cli("--config", project("clean"), "--strict")).to eq(0)
         expect(out.string).to include("0 findings in CleanProject")
