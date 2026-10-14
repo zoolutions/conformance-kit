@@ -178,7 +178,7 @@ Conformance is enforced by **one workflow in this repo**, `.github/workflows/con
 2. the Gemfile lines (`conformance-kit ~> 0.2`, `rubocop-thread_safety >= 0.8`),
 3. `inherit_gem: { conformance-kit: config/rubocop.yml }` in `.rubocop.yml`.
 
-The org ruleset, `conformance`, targets the default branch of every repo whose `conformance` custom property is `enforced`. A repo is flipped once its `bundle exec conformance-kit check` is green on Ruby 4.0:
+The org ruleset, `conformance`, targets the default branch of every repo whose `conformance` custom property is `enforced`. A repo is flipped once its child issue closes and `bundle exec conformance-kit check` is green on Ruby 4.0 on its `main`:
 
 ```bash
 gh api -X PATCH repos/zoolutions/<repo>/properties/values \
@@ -194,18 +194,18 @@ The workflow runs on `pull_request` and `merge_group`, with two jobs:
 
 ### After a release: bump the ruleset `ref`
 
-The ruleset pins `conformance.yml` to a release tag, never a branch. When a release changes `.github/workflows/conformance.yml` (its notes say so), point the ruleset at the new tag once `bin/release` has pushed it:
+The ruleset pins `conformance.yml` to a release tag, never a branch. When a release changes `.github/workflows/conformance.yml` (its notes say so), point the ruleset at the new tag once the release is on RubyGems:
 
 ```bash
 tag=refs/tags/vX.Y.Z
 id=$(gh api orgs/zoolutions/rulesets --jq '.[] | select(.name == "conformance") | .id')
 gh api "orgs/zoolutions/rulesets/$id" \
-  | jq --arg ref "$tag" '{rules: [.rules[] | if .type == "workflows" then .parameters.workflows |= map(.ref = $ref) else . end]}' \
+  | jq --arg ref "$tag" '{name, target, enforcement, bypass_actors, conditions, rules: [.rules[] | if .type == "workflows" then .parameters.workflows |= map(.ref = $ref | del(.sha)) else . end]}' \
   | gh api -X PUT "orgs/zoolutions/rulesets/$id" --input -
 gh api "orgs/zoolutions/rulesets/$id" --jq '.enforcement, .rules[].parameters.workflows[]?.ref'
 ```
 
-The `PUT` replaces the whole `rules` array, so it is rebuilt from the current ruleset rather than typed by hand. A release that leaves `conformance.yml` untouched needs no bump. After a minor or major bump, a consumer still resolving an older `conformance-kit` fails the version handshake until it moves to `~> X.Y`.
+The `PUT` body is rebuilt from the live ruleset (every writable field, the whole `rules` array, the old `sha` dropped) rather than typed by hand. A release that leaves `conformance.yml` untouched needs no bump. After a minor or major bump, a consumer still resolving an older `conformance-kit` fails the version handshake until it moves to `~> X.Y`.
 
 ### `conformance-kit check`, the local equivalent
 
