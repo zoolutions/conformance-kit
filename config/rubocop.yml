@@ -1,0 +1,35 @@
+# conformance-kit's Tier 1 RuboCop gate. In a consuming gem's .rubocop.yml:
+#
+#   inherit_gem:
+#     conformance-kit: config/rubocop.yml
+#
+# and add `gem "rubocop-thread_safety", require: false` to its Gemfile (the kit
+# never adds dependencies for you). Exclude a file or line only with a comment
+# saying why it is safe, e.g. a Mutex created at load and only used on the main
+# Ractor, or the specs that start threads on purpose.
+plugins:
+  - rubocop-thread_safety
+
+# The six cops of the epic's Tier 1, on whatever the consumer's NewCops is.
+ThreadSafety/ClassAndModuleAttributes:
+  Enabled: true
+
+ThreadSafety/ClassInstanceVariable:
+  Enabled: true
+
+ThreadSafety/MutableClassInstanceVariable:
+  Enabled: true
+  EnforcedStyle: literals
+
+ThreadSafety/NewThread:
+  Enabled: true
+
+ThreadSafety/DirChdir:
+  Enabled: true
+
+ThreadSafety/RackMiddlewareInstanceVariable:
+  Enabled: true
+
+# `@mutex ||= Mutex.new` is itself a race: two threads can build two locks.
+ThreadSafety/LazySynchronizationPrimitive:
+  Enabled: true

@@ -1,0 +1,16 @@
+# conformance-kit's report-only Spinel probe (Tier 4): only the Spinel cops,
+# never a gate. Run by .github/workflows/probes.yml as
+#
+#   rubocop --config <conformance-kit>/config/rubocop_spinel.yml lib
+#
+# It flags `class << self`, which every zoolutions gem uses: read the report,
+# don't chase it.
+plugins:
+  - rubocop_spinel
+
+AllCops:
+  DisabledByDefault: true
+  SuggestExtensions: false
+
+Spinel/Unsupported:
+  Enabled: true

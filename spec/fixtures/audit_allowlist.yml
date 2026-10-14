@@ -1,0 +1,10 @@
+# Allowlists every AuditFixture finding: `--strict` exits 0 with this file.
+main_only:
+  - name: AuditFixture::LOCK
+    reason: the fixture's main-only lock
+  - name: AuditFixture::NAMES
+    reason: the fixture's unfrozen Array
+  - name: AuditFixture::Hooks.@on_save
+    reason: the fixture's Proc hook
+  - name: AuditFixture::Registry.@lock
+    reason: the fixture's registry lock, only touched on the main Ractor
