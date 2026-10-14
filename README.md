@@ -187,7 +187,7 @@ jobs:
 | `paths` | `lib` | what rubocop_spinel inspects (space-separated) |
 | `roundhouse-app` | `""` | a Rails app directory (e.g. `spec/dummy`); empty skips it |
 | `roundhouse-version` | `v2026.9.18` | the rubys/roundhouse release to install |
-| `roundhouse-sha256` | that release's Linux tarball | checked before the binary runs; change it with `roundhouse-version` |
+| `roundhouse-sha256` | SHA-256 of that release's `roundhouse-x86_64-unknown-linux-musl.tar.xz` | checked before the binary runs; change it with `roundhouse-version` |
 | `artifact-name` | `conformance-probes` | |
 | `working-directory` | `.` | |
 

@@ -72,6 +72,7 @@ RSpec.describe ConformanceKit::Store do
 
   context "inside a non-main Ractor on the fallback path (Ruby 3.2/3.3)", :ractor do
     before do
+      skip "no Ractor on #{RUBY_ENGINE}" unless defined?(Ractor)
       if described_class.native?
         skip "Ractor.store_if_absent exists on #{RUBY_VERSION}: the native path is covered below"
       end
@@ -87,6 +88,17 @@ RSpec.describe ConformanceKit::Store do
 
       expect(ids.uniq.size).to eq(1)
       expect(ids.first).not_to eq(main.__id__)
+    end
+
+    it "caches a nil or false value instead of rerunning the initializer" do
+      ractor = Ractor.new do
+        calls = 0
+        2.times { ConformanceKit::Store.fetch(:conformance_kit_store_fallback_nil) { calls += 1 and nil } }
+        2.times { ConformanceKit::Store.fetch(:conformance_kit_store_fallback_false) { calls += 1 and false } }
+        calls
+      end
+
+      expect(ractor.respond_to?(:value) ? ractor.value : ractor.take).to eq(2)
     end
   end
 

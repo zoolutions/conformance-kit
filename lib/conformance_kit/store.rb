@@ -31,8 +31,9 @@ module ConformanceKit
 
       def main_ractor? = !defined?(::Ractor) || ::Ractor.current == ::Ractor.main
 
+      # Boxed, so a nil or false value is cached rather than rebuilt on every fetch.
       def ractor_local(key)
-        ::Ractor.current[:"conformance_kit_store/#{key}"] ||= yield
+        (::Ractor.current[:"conformance_kit_store/#{key}"] ||= [yield]).first
       end
 
       public

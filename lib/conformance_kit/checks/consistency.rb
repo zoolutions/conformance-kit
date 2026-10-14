@@ -6,6 +6,8 @@ module ConformanceKit
     # and the `consistent:` option.
     module Consistency
       MODES = %i[identical equal].freeze
+      # How many distinct results a failure report tells apart before it stops counting.
+      DIAGNOSED = 10
 
       class << self
         def validate_counts!(**counts)
@@ -42,16 +44,23 @@ module ConformanceKit
 
         private
 
-        # Array#uniq compares with eql?/hash (1 and 1.0 differ); :equal promises ==.
+        # Array#uniq compares with eql?/hash (1 and 1.0 differ); :equal promises ==. Stops past
+        # DIAGNOSED distinct values, so N different results cost O(N) == calls, not O(N²).
         def uniq_by_equality(results)
-          results.each_with_object([]) { |result, seen| seen << result unless seen.any? { |s| s == result } }
+          results.each_with_object([]) do |result, seen|
+            next if seen.any? { |s| s == result }
+
+            seen << result
+            break seen if seen.size > DIAGNOSED
+          end
         end
 
         def distinct(unique, mode)
           return nil if unique.size <= 1
 
+          count = unique.size > DIAGNOSED ? "more than #{DIAGNOSED}" : unique.size
           classes = unique.group_by { _1.class.name }.map { |name, all| "#{name} ×#{all.size}" }.join(", ")
-          "returned #{unique.size} distinct results (#{classes}), so the `consistent: #{mode.inspect}` check failed"
+          "returned #{count} distinct results (#{classes}), so the `consistent: #{mode.inspect}` check failed"
         end
       end
     end
