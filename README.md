@@ -6,8 +6,8 @@ Concurrency conformance for the zoolutions gems. A gem that adopts it is held to
 |---|---|---|
 | 1 thread-safe | no unguarded shared mutable state on the request/broadcast path | `config/rubocop.yml` (rubocop-thread_safety) + `"thread-safe under contention"` |
 | 2 fiber-safe | correct under a fiber scheduler (Falcon/Async): request state fiber-local, no `Thread.main[]` misuse | `"fiber-safe under an Async reactor"` |
-| 3 Ractor-clean | the gem adds no Ractor blocker beyond its dependencies': config shareable after boot, per-Ractor caches, no locks in constants | `"a boot-finalized configuration"`, `conformance-audit --strict`, the Ruby 4.0 `"runs inside a non-main Ractor"` canary (`ractor.yml`) |
-| 4 compiler-probed | Spinel/Roundhouse readiness is measured, never gated | `probes.yml` (report-only) |
+| 3 Ractor-clean | the gem adds no Ractor blocker beyond its dependencies': config shareable after boot, per-Ractor caches, no locks in constants | `"a boot-finalized configuration"`, `conformance-audit --strict`, the Ruby 4.0 `"runs inside a non-main Ractor"` canary (`conformance.yml`) |
+| 4 compiler-probed | Spinel/Roundhouse readiness is measured, never gated | the probes job of `conformance.yml` (report-only) |
 
 Background, the finalize-at-boot pattern and the settled decisions: [zoolutions/phlex-reactive#363](https://github.com/zoolutions/phlex-reactive/issues/363).
 
@@ -16,7 +16,7 @@ Background, the finalize-at-boot pattern and the settled decisions: [zoolutions/
 ```ruby
 # Gemfile
 group :development, :test do
-  gem "conformance-kit", "~> 0.1", require: false
+  gem "conformance-kit", "~> 0.2", require: false
   gem "rubocop-thread_safety", ">= 0.8", require: false # for config/rubocop.yml
   gem "async", require: false                 # optional: runs the fiber example
 end
@@ -101,10 +101,11 @@ On Ruby 3.4+ this is `Ractor.store_if_absent` (atomic, one value per Ractor). Be
 ## `conformance-audit`
 
 ```bash
-bundle exec conformance-audit --require ./lib/my_gem --namespace MyGem --strict
+bundle exec conformance-audit --strict                                         # audit.require + audit.namespace from .conformance.yml
+bundle exec conformance-audit --require ./lib/my_gem --namespace MyGem --strict # flags override them
 ```
 
-Requires the files, walks every loaded module under the namespaces (`--require` and `--namespace` repeat), and reports each public constant and class/module instance variable whose value is not `Ractor.shareable?`, with the path to the offending object and the fix:
+Requires the files, walks every loaded module under the namespaces (`--require` and `--namespace` repeat; without them it reads `audit.require` and `audit.namespace`), and reports each public constant and class/module instance variable whose value is not `Ractor.shareable?`, with the path to the offending object and the fix:
 
 ```
 conformance-audit: 2 findings in MyGem (1 allowlisted main-only; 14 modules audited, 0 unloaded autoloads skipped)
@@ -114,28 +115,48 @@ conformance-audit: 2 findings in MyGem (1 allowlisted main-only; 14 modules audi
 
 Limits, so a green run means what it says:
 
-- Unloaded autoload constants are skipped and listed, never loaded mid-walk: require (or eager-load) everything the audit should see. The header counts the modules audited and the autoloads skipped.
+- Unloaded autoload constants are skipped and listed, never loaded mid-walk: require (or eager-load) everything the audit should see. The header counts the modules audited and the autoloads skipped. With `audit.strict_autoloads: true`, `--strict` also fails on every skipped autoload not listed in `audit.skip_autoloads`, so a green run means everything was audited.
 - `private_constant`s are invisible to it (Ruby has no public way to enumerate them). `config/rubocop.yml` and the boot-finalized example are the gates for those.
 
 | Exit | Meaning |
 |---|---|
 | 0 | no unallowlisted findings; or findings without `--strict` (report only); or no `Ractor` on this engine |
-| 1 | unallowlisted findings under `--strict` |
-| 2 | usage error, a namespace that is not defined or not a module, a file that cannot be required, or an invalid allowlist |
+| 1 | unallowlisted findings under `--strict` (or, with `audit.strict_autoloads`, unlisted unloaded autoloads) |
+| 2 | usage error, no namespace from either the flags or `audit.namespace`, a namespace that is not defined or not a module, a file that cannot be required, or an invalid `.conformance.yml` |
 
 ### `.conformance.yml`
 
-State that is deliberately main-only, read from `.conformance.yml` in the working directory (or `--allowlist PATH`). Every entry needs a `reason:`; an entry without one is an error (exit 2).
+One file per repo says what it is held to. It is read from the working directory (or `--config PATH`; `--allowlist PATH` still works); paths in it are relative to it. Every key is validated: an unknown key or a wrong type is an error (exit 2) naming the file and the key.
 
 ```yaml
+audit:
+  require: [./lib/my_gem, ./spec/support/eager_load.rb]   # files to require (list)
+  namespace: [MyGem]                                       # constants to audit (list)
+  strict_autoloads: true                                   # optional, default false
+  skip_autoloads:                                          # optional; each needs a reason
+    - name: MyGem::Optional
+      reason: only loads with pgbus present
+ractor:
+  ruby: "4.0"                                  # default "4.0" (quote it)
+  test_command: bundle exec rspec --tag ractor # default; Minitest gems set their own
+  env:                                         # optional string map, applied before setup/test_command
+    PGBUS_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pgbus_test
+  setup: bin/conformance-db-setup              # optional command run once before test_command
+  working_directory: .                         # default "."
+probes:
+  gem_name: my_gem                             # required for the probes job
+  paths: [lib]                                 # default [lib]
+  roundhouse_app: spec/dummy                   # optional
 main_only:
-  - name: MyGem::Registry.@lock     # class/module ivar: Owner.@ivar
+  - name: MyGem::Registry.@lock                # class/module ivar: Owner.@ivar
     reason: guards boot-time registration; no non-main Ractor ever registers
-  - name: MyGem::LOCK               # constant: Owner::NAME
+  - name: MyGem::LOCK                          # constant: Owner::NAME
     reason: ...
 ```
 
-Entries inside the audited namespaces that no longer turn up are listed as stale.
+`main_only:` is state that is deliberately main-only: every entry needs a `reason:`. Entries inside the audited namespaces that no longer turn up are listed as stale, and so are `audit.skip_autoloads` entries that are no longer unloaded autoloads.
+
+`strict_autoloads: true` needs `audit.require` to load everything, e.g. a file that calls your Zeitwerk loader's `eager_load!`.
 
 ## RuboCop
 
@@ -149,47 +170,42 @@ Turns on the six `rubocop-thread_safety` cops (`ClassAndModuleAttributes`, `Clas
 
 `config/rubocop_spinel.yml` runs only `Spinel/Unsupported` (rubocop_spinel). It is for the report-only probe, never your lint: it flags `class << self`.
 
-## Reusable workflows
+## Enforcement
 
-```yaml
-# .github/workflows/main.yml
-jobs:
-  ractor:
-    uses: zoolutions/conformance-kit/.github/workflows/ractor.yml@main
-    with:
-      require: ./lib/my_gem
-      namespace: MyGem
+Conformance is enforced by **one workflow in this repo**, `.github/workflows/conformance.yml`, which a zoolutions org ruleset requires at a release tag (`conformance.yml@refs/tags/vX.Y.Z`). A repo needs no workflow of its own: it opts in with
 
-  probes:
-    uses: zoolutions/conformance-kit/.github/workflows/probes.yml@main
-    with:
-      gem-name: my_gem
+1. `.conformance.yml` (above),
+2. the Gemfile lines (`conformance-kit ~> 0.2`, `rubocop-thread_safety >= 0.8`),
+3. `inherit_gem: { conformance-kit: config/rubocop.yml }` in `.rubocop.yml`.
+
+The workflow runs on `pull_request` and `merge_group`, with two jobs:
+
+- **Conformance (Ruby `ractor.ruby`)**, the gate: the version handshake, then `bundle exec conformance-kit check`. A `postgres:18` service (user and password `postgres`, port 5432) is always up; the workflow exports nothing, so `ractor.env` and `ractor.setup` wire it.
+- **Compiler probes (report-only)**: `rubocop_spinel` (gem-installed in the probe, never in your Gemfile), `spinel-compat probe <probes.gem_name> --dir .` and, when `probes.roundhouse_app` is set, `roundhouse check` (the release tarball, checked against a pinned SHA-256). Every probe continues on error; the reports go to the run summary and a `conformance-probes` artifact. It never fails a build, and it skips with a notice when `probes.gem_name` is unset.
+
+### `conformance-kit check`, the local equivalent
+
+```bash
+bundle exec conformance-kit check    # doctor, ractor.setup, ractor.test_command, then conformance-audit --strict
+bundle exec conformance-kit doctor   # the static checks only
+bundle exec conformance-kit config probes.gem_name
 ```
 
-**`ractor.yml`** (the Tier 3 gate): the Ractor examples, then `conformance-audit --strict`.
+`check` stops at the first failing stage, names it, and exits with its status. Run it before flipping a repo: what passes here passes the workflow (on the same Ruby).
 
-| Input | Default | |
-|---|---|---|
-| `require` | required | files the audit requires (space-separated) |
-| `namespace` | required | constants to audit (space-separated) |
-| `ruby-version` | `4.0` | |
-| `allowlist` | `.conformance.yml` | skipped when the default file is absent |
-| `test-command` | `bundle exec rspec --tag ractor` | Minitest gems pass their own |
-| `audit` | `true` | `false` runs only the examples |
-| `working-directory` | `.` | |
+`doctor` checks that `.conformance.yml` exists, is valid and sets `audit.namespace`; that `.rubocop.yml` inherits `conformance-kit: config/rubocop.yml`; and that `rubocop-thread_safety` resolves at `>= 0.8`. Each problem names its fix. `--expect X.Y` also checks the resolved `conformance-kit` is at least `X.Y`.
 
-**`probes.yml`** (Tier 4, report-only): `rubocop_spinel`, `spinel-compat probe <gem-name> --dir .` and, when `roundhouse-app` is set, `roundhouse check`. Every probe step continues on error; the reports go to the run summary and an artifact. It never fails a build.
+`config KEY` prints a dotted key's value (a list joined with spaces, `ractor.env` as `NAME=value` lines, an unset key as an empty line); an unknown key exits 2.
 
-| Input | Default | |
-|---|---|---|
-| `gem-name` | required | the gem spinel-compat probes from the checkout |
-| `ruby-version` | `4.0` | |
-| `paths` | `lib` | what rubocop_spinel inspects (space-separated) |
-| `roundhouse-app` | `""` | a Rails app directory (e.g. `spec/dummy`); empty skips it |
-| `roundhouse-version` | `v2026.9.18` | the rubys/roundhouse release to install |
-| `roundhouse-sha256` | SHA-256 of that release's `roundhouse-x86_64-unknown-linux-musl.tar.xz` | checked before the binary runs; change it with `roundhouse-version` |
-| `artifact-name` | `conformance-probes` | |
-| `working-directory` | `.` | |
+| Exit | Meaning |
+|---|---|
+| 0 | ok |
+| 1 | a check failed (`check` exits with the failing stage's status) |
+| 2 | usage error or an invalid `.conformance.yml` |
+
+### The version handshake
+
+The behaviour a repo is held to comes from the `conformance-kit` in its lockfile; only the plumbing comes from the workflow tag. So a stale lockfile cannot pass a newer workflow vacuously, the workflow reads its own tag from `github.workflow_ref` and fails with "bump conformance-kit to ~> X.Y" when the repo resolves anything older than `X.Y`. The version is derived, never stored: a release bumps only the ruleset's `ref`. On a ref that is not a `refs/tags/v*` tag (this repo's own pull requests) the handshake is skipped with a notice.
 
 ## Development
 
@@ -197,4 +213,4 @@ jobs:
 bundle exec rake   # rspec + rubocop; CI runs Ruby 3.2, 3.4 and 4.0
 ```
 
-Every check is proven both ways against `spec/fixtures/`: a violating fixture it must catch and a conforming one it must pass. The kit audits itself (`.conformance.yml`) and calls its own workflows in CI.
+Every check is proven both ways against `spec/fixtures/`: a violating fixture it must catch and a conforming one it must pass. The kit audits itself (`.conformance.yml`, strict, nothing skipped), and `conformance.yml` runs on its own pull requests.

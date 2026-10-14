@@ -1,0 +1,217 @@
+name: Conformance
+
+# The org-required conformance gate (conformance-kit). A zoolutions org ruleset
+# requires this workflow at a release tag (refs/tags/vX.Y.Z), so it takes no
+# inputs: each repo's .conformance.yml says what it is held to, and
+# `conformance-kit check`, at the version in the repo's lockfile, does the work.
+# A repo opts in with .conformance.yml, the Gemfile line and inherit_gem.
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+env:
+  CONFORMANCE_CONFIG: .conformance.yml
+
+jobs:
+  settings:
+    name: Conformance settings
+    runs-on: ubuntu-latest
+    outputs:
+      ruby: ${{ steps.read.outputs.ruby }}
+      working-directory: ${{ steps.read.outputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The one shell read: setup-ruby needs these before conformance-kit is installed.
+      - name: Read ractor.ruby and ractor.working_directory
+        id: read
+        run: |
+          ruby=4.0
+          dir=.
+          if [ -f "$CONFORMANCE_CONFIG" ]; then
+            ruby=$(yq '.ractor.ruby // "4.0"' "$CONFORMANCE_CONFIG")
+            dir=$(yq '.ractor.working_directory // "."' "$CONFORMANCE_CONFIG")
+          fi
+          if [[ ! "$ruby" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error file=$CONFORMANCE_CONFIG::ractor.ruby must be a version like \"4.0\", got: $ruby"
+            exit 1
+          fi
+          if [[ ! "$dir" =~ ^[A-Za-z0-9._/-]+$ || "$dir" == *..* ]]; then
+            echo "::error file=$CONFORMANCE_CONFIG::ractor.working_directory must be a path inside the repo, got: $dir"
+            exit 1
+          fi
+          echo "ruby=$ruby" >> "$GITHUB_OUTPUT"
+          echo "working-directory=$dir" >> "$GITHUB_OUTPUT"
+
+  ractor:
+    name: Conformance (Ruby ${{ needs.settings.outputs.ruby }})
+    needs: settings
+    runs-on: ubuntu-latest
+    # Always there; .conformance.yml ractor.env and ractor.setup wire it per repo.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: ${{ needs.settings.outputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: ${{ needs.settings.outputs.ruby }}
+          bundler-cache: true
+          working-directory: ${{ needs.settings.outputs.working-directory }}
+
+      # The tag this workflow runs at must not be newer than the repo's
+      # conformance-kit, or a stale lockfile would pass it vacuously. Derived
+      # from the ref, never stored: a release bumps only the ruleset's ref.
+      - name: Version handshake
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          if [[ ! "$WORKFLOW_REF" =~ @refs/tags/v([0-9]+)\.([0-9]+)\. ]]; then
+            echo "::notice::conformance.yml runs at ${WORKFLOW_REF#*@}, not a release tag: version handshake skipped"
+            exit 0
+          fi
+          expect="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+          resolved=$(bundle exec ruby -e 'spec = Gem.loaded_specs["conformance-kit"]; print spec.version if spec')
+          if [ -z "$resolved" ]; then
+            echo "::error::conformance-kit is not in the bundle: add gem \"conformance-kit\", \"~> $expect\", require: false"
+            exit 1
+          fi
+          if ! ruby -e 'exit Gem::Version.new(ARGV[0]) >= Gem::Version.new(ARGV[1])' "$resolved" "$expect"; then
+            echo "::error::conformance-kit $resolved is resolved, this workflow is v$expect: bump conformance-kit to ~> $expect"
+            exit 1
+          fi
+          echo "conformance-kit $resolved satisfies the workflow's v$expect"
+
+      - name: conformance-kit check
+        run: bundle exec conformance-kit check --config "$GITHUB_WORKSPACE/$CONFORMANCE_CONFIG"
+
+  probes:
+    name: Compiler probes (report-only)
+    needs: settings
+    runs-on: ubuntu-latest
+    env:
+      ROUNDHOUSE_VERSION: v2026.9.18
+      # SHA-256 of that release's x86_64-unknown-linux-musl tarball: change it with ROUNDHOUSE_VERSION.
+      ROUNDHOUSE_SHA256: aa8b13f53154ad41cc0a83088f6d4f06532760ec8dbeb165eccc0c946bcd7945
+    defaults:
+      run:
+        working-directory: ${{ needs.settings.outputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: ${{ needs.settings.outputs.ruby }}
+          bundler-cache: true
+          working-directory: ${{ needs.settings.outputs.working-directory }}
+
+      - name: Probe settings
+        id: probes
+        continue-on-error: true
+        run: |
+          mkdir -p conformance-probes
+          config() { bundle exec conformance-kit config "$1" --config "$GITHUB_WORKSPACE/$CONFORMANCE_CONFIG"; }
+          if ! gem_name=$(config probes.gem_name); then
+            echo "::notice::conformance-kit config is unavailable (conformance-kit below 0.2?): probes skipped"
+            exit 0
+          fi
+          paths=$(config probes.paths)
+          app=$(config probes.roundhouse_app)
+          if [ -z "$gem_name" ]; then
+            echo "::notice::probes.gem_name is not set in $CONFORMANCE_CONFIG: probes skipped"
+            exit 0
+          fi
+          if [[ ! "$gem_name" =~ ^[A-Za-z0-9._-]+$ || ! "$paths" =~ ^[A-Za-z0-9._/\ -]+$ || ! "$app" =~ ^[A-Za-z0-9._/-]*$ ]]; then
+            echo "::notice::probes.gem_name, probes.paths or probes.roundhouse_app has unexpected characters: probes skipped"
+            exit 0
+          fi
+          {
+            echo "gem-name=$gem_name"
+            echo "paths=$paths"
+            echo "roundhouse-app=$app"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: "Probe: rubocop_spinel"
+        if: steps.probes.outputs.gem-name != ''
+        continue-on-error: true
+        env:
+          PATHS: ${{ steps.probes.outputs.paths }}
+        run: |
+          gem install rubocop_spinel --version 0.2.0 --no-document
+          kit=$(bundle exec ruby -e 'print Gem.loaded_specs.fetch("conformance-kit").full_gem_path')
+          # shellcheck disable=SC2086 # PATHS is a space-separated list
+          rubocop --config "$kit/config/rubocop_spinel.yml" --format json --out conformance-probes/rubocop_spinel.json \
+            --format progress $PATHS | tee conformance-probes/rubocop_spinel.txt
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.probes.outputs.gem-name != ''
+        with:
+          path: ~/.cache/spinel
+          key: spinel-engine-${{ runner.os }}-bundler-spinel-0.4.0
+
+      - name: "Probe: spinel-compat"
+        if: steps.probes.outputs.gem-name != ''
+        continue-on-error: true
+        env:
+          GEM_NAME: ${{ steps.probes.outputs.gem-name }}
+        run: |
+          gem install bundler-spinel --version 0.4.0 --no-document
+          spinel-compat install-engine 2>&1 | tail -n 20 | tee conformance-probes/spinel-engine.txt
+          spinel-compat probe "$GEM_NAME" --dir . 2>&1 | tee conformance-probes/spinel-probe.txt
+
+      - name: "Probe: roundhouse check"
+        if: steps.probes.outputs.roundhouse-app != ''
+        continue-on-error: true
+        env:
+          APP: ${{ steps.probes.outputs.roundhouse-app }}
+        run: |
+          # The release binary, checked against a pinned digest before it runs (never a piped installer).
+          tarball=roundhouse-x86_64-unknown-linux-musl.tar.xz
+          curl --proto '=https' --tlsv1.2 -fLsS -o "$RUNNER_TEMP/$tarball" \
+            "https://github.com/rubys/roundhouse/releases/download/$ROUNDHOUSE_VERSION/$tarball"
+          echo "$ROUNDHOUSE_SHA256  $RUNNER_TEMP/$tarball" | sha256sum --check --strict
+          tar -xJf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/roundhouse-x86_64-unknown-linux-musl/roundhouse" check --continue "$APP" 2>&1 \
+            | tee conformance-probes/roundhouse.txt
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Compiler probes (report-only)"
+            for report in conformance-probes/*.txt; do
+              [ -f "$report" ] || continue
+              echo "### $(basename "$report" .txt)"
+              echo '```'
+              tail -n 40 "$report"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: conformance-probes
+          path: ${{ needs.settings.outputs.working-directory }}/conformance-probes
+          if-no-files-found: warn
