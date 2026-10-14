@@ -1,0 +1,38 @@
+spec/conformance_kit/audit_spec.rb
+  s_0ac168ea29ecb8::t_76d94741c6ed67 141-142
+  s_0ac168ea29ecb8::t_a851de5b88462d 138-140,143-148
+lib/conformance_kit/config.rb
+  s_0ac168ea29ecb8::t_d0d1c8c112722a 55-57,69,71,103-107,109
+README.md
+  ai_agent 118,129,208
+spec/conformance_kit/config_spec.rb
+  s_0ac168ea29ecb8::t_a851de5b88462d 115-132
+lib/conformance_kit/cli/doctor.rb
+  s_0ac168ea29ecb8::t_d0d1c8c112722a 63-64
+spec/conformance_kit/cli_spec.rb
+  s_0ac168ea29ecb8::t_a851de5b88462d 71-80,127-130
+spec/conformance_kit/configs_and_workflows_spec.rb
+  s_0ac168ea29ecb8::t_a851de5b88462d 111-120
+.github/workflows/conformance.yml
+  s_0ac168ea29ecb8::t_d0d1c8c112722a 44,112-113
+lib/conformance_kit/cli.rb
+  s_0ac168ea29ecb8::t_d0d1c8c112722a 77-80
+CHANGELOG.md
+  ai_agent 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9abcc04f4af99b65a596737247936abf0e24d690",
+  "prompts": {},
+  "sessions": {
+    "s_0ac168ea29ecb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5b4ca5b-1f04-4f63-b577-3bf143a5a8be",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
