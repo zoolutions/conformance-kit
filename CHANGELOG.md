@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Breaking (pre-1.0): `conformance.yml` is a reusable workflow that each repo calls, instead of one an org ruleset requires. It runs on `workflow_call` only. A repo adds a caller pinned to a release tag (`uses: zoolutions/conformance-kit/.github/workflows/conformance.yml@vX.Y.Z`, see the README) and makes `conformance / Conformance (Ruby 4.0)` a required check in its own branch ruleset. Repos outside zoolutions can use it the same way.
+Breaking (pre-1.0): `conformance.yml` is a reusable workflow that each repo calls, instead of one an org ruleset requires. It runs on `workflow_call` only. A repo adds a caller pinned to a release tag (`uses: zoolutions/conformance-kit/.github/workflows/conformance.yml@vX.Y.Z`, see the README) and makes `conformance / Conformance settings` and `conformance / Conformance (Ruby 4.0)` required checks in its own branch ruleset. Repos outside zoolutions can use it the same way.
 
 - The version handshake reads `job.workflow_ref` (the called workflow's own tag) instead of `github.workflow_ref` (the caller's).
 - This repo calls its own workflow through `.github/workflows/conformance-self.yml`.

@@ -142,7 +142,7 @@ paths:
   "exe/conformance-audit": audit
   "spec/conformance_kit/audit*": audit
   "config/**/*": config
-  ".github/workflows/{ractor,probes}.yml": config
+  ".github/workflows/conformance*.yml": config
   ".github/**/*": devops
   "bin/release": devops
   "rakelib/**/*": devops
