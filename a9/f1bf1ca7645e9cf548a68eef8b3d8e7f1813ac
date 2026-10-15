@@ -1,0 +1,9 @@
+lib/conformance_kit/version.rb
+  ai_agent 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a9f1bf1ca7645e9cf548a68eef8b3d8e7f1813ac",
+  "prompts": {}
+}
