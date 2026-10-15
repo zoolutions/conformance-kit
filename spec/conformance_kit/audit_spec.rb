@@ -178,6 +178,11 @@ RSpec.describe ConformanceKit::Audit do
       end
     end
 
+    it "accepts a constant path with Unicode identifiers" do
+      expect(ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "Ärger::Basis", "reason" => "r" }]).ancestor_rules
+        .map(&:ancestor)).to eq(["Ärger::Basis"])
+    end
+
     it "rejects, at audit time, an ancestor path that resolves to a module every module has" do
       allowlist = ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "Object::Kernel", "reason" => "r" }])
 

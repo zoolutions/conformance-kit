@@ -101,7 +101,8 @@ module ConformanceKit
         raise AllowlistError, "#{source}: #{entry['name']}: ivars: only goes with an ancestor:"
       end
 
-      CONSTANT_PATH = /\A(?:::)?[A-Z]\w*(?:::[A-Z]\w*)*\z/
+      # Ruby's constant rule, Unicode included: each segment starts with an uppercase letter.
+      CONSTANT_PATH = /\A(?:::)?\p{Upper}\p{Word}*(?:::\p{Upper}\p{Word}*)*\z/
       private_constant :CONSTANT_PATH
 
       def validate_ancestor(entry, ancestor, source)
