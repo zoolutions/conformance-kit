@@ -1,14 +1,12 @@
 name: Conformance
 
-# The org-required conformance gate (conformance-kit). A zoolutions org ruleset
-# requires this workflow at a release tag (refs/tags/vX.Y.Z), so it takes no
-# inputs: each repo's .conformance.yml says what it is held to, and
+# The conformance gate (conformance-kit), a reusable workflow. Each repo calls
+# it at a release tag (the caller is in the README) and takes no inputs: the repo's .conformance.yml says what it is held to, and
 # `conformance-kit check`, at the version in the repo's lockfile, does the work.
-# A repo opts in with .conformance.yml, the Gemfile line and inherit_gem.
+# A repo opts in with the caller, .conformance.yml, the Gemfile line and inherit_gem.
 
 on:
-  pull_request:
-  merge_group:
+  workflow_call:
 
 permissions:
   contents: read
@@ -81,10 +79,11 @@ jobs:
 
       # The tag this workflow runs at must not be newer than the repo's
       # conformance-kit, or a stale lockfile would pass it vacuously. Derived
-      # from the ref, never stored: a release bumps only the ruleset's ref.
+      # from job.workflow_ref (this file's own ref; github.workflow_ref is the
+      # caller's), never stored.
       - name: Version handshake
         env:
-          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_REF: ${{ job.workflow_ref }}
         run: |
           if [[ ! "$WORKFLOW_REF" =~ @refs/tags/v([0-9]+)\.([0-9]+)\. ]]; then
             echo "::notice::conformance.yml runs at ${WORKFLOW_REF#*@}, not a release tag: version handshake skipped"

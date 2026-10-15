@@ -1,0 +1,15 @@
+name: Conformance
+
+# This repo's own caller of conformance.yml: the same file a consumer adds,
+# except that it calls this checkout instead of a release tag.
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    uses: ./.github/workflows/conformance.yml

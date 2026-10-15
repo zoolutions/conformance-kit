@@ -16,7 +16,7 @@ Background, the finalize-at-boot pattern and the settled decisions: [zoolutions/
 ```ruby
 # Gemfile
 group :development, :test do
-  gem "conformance-kit", "~> 0.2", require: false
+  gem "conformance-kit", "~> 0.3", require: false
   gem "rubocop-thread_safety", ">= 0.8", require: false # for config/rubocop.yml
   gem "async", require: false                 # optional: runs the fiber example
 end
@@ -172,16 +172,54 @@ Turns on the six `rubocop-thread_safety` cops (`ClassAndModuleAttributes`, `Clas
 
 ## Enforcement
 
-Conformance is enforced by **one workflow in this repo**, `.github/workflows/conformance.yml`, which a zoolutions org ruleset requires at a release tag (`conformance.yml@refs/tags/vX.Y.Z`). A repo needs no workflow of its own: it opts in with
+Conformance runs as **one reusable workflow in this repo**, `.github/workflows/conformance.yml`. Any repo can call it, inside zoolutions or not. A repo opts in with
 
 1. `.conformance.yml` (above),
-2. the Gemfile lines (`conformance-kit ~> 0.2`, `rubocop-thread_safety >= 0.8`),
-3. `inherit_gem: { conformance-kit: config/rubocop.yml }` in `.rubocop.yml`.
+2. the Gemfile lines (`conformance-kit ~> 0.3`, `rubocop-thread_safety >= 0.8`),
+3. `inherit_gem: { conformance-kit: config/rubocop.yml }` in `.rubocop.yml`,
+4. a caller, pinned to a release tag:
 
-The workflow runs on `pull_request` and `merge_group`, with two jobs:
+```yaml
+# .github/workflows/conformance.yml
+name: Conformance
 
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    uses: zoolutions/conformance-kit/.github/workflows/conformance.yml@v0.3.0
+```
+
+To make it a merge requirement, add `conformance / Conformance settings` and `conformance / Conformance (Ruby 4.0)` to the required status checks in the repo's branch ruleset (the Ruby is `ractor.ruby`, so the name changes with it). Leave the probes out: they never fail.
+
+The workflow has three jobs:
+
+- **Conformance settings** reads `ractor.ruby` and `ractor.working_directory`.
 - **Conformance (Ruby `ractor.ruby`)**, the gate: the version handshake, then `bundle exec conformance-kit check`. A `postgres:18` service (user and password `postgres`, port 5432) is always up; the workflow exports nothing, so `ractor.env` and `ractor.setup` wire it.
 - **Compiler probes (report-only)**: `rubocop_spinel` (gem-installed in the probe, never in your Gemfile), `spinel-compat probe <probes.gem_name> --dir .` and, when `probes.roundhouse_app` is set, `roundhouse check` (the release tarball, checked against a pinned SHA-256). Every probe continues on error; the reports go to the run summary and a `conformance-probes` artifact. It never fails a build, and it skips with a notice when `probes.gem_name` is unset.
+
+### Staying current
+
+Dependabot bumps both pins: the `uses:` tag (`github-actions`) and the gem (`bundler`), in separate pull requests.
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: bundler
+    directory: /
+    schedule: { interval: weekly }
+```
+
+Merge the gem bump first: after a minor or major release the workflow bump fails the version handshake until the lockfile has caught up.
 
 ### `conformance-kit check`, the local equivalent
 
@@ -191,7 +229,7 @@ bundle exec conformance-kit doctor   # the static checks only
 bundle exec conformance-kit config probes.gem_name
 ```
 
-`check` stops at the first failing stage, names it, and exits with its status. Run it before flipping a repo: what passes here passes the workflow (on the same Ruby).
+`check` stops at the first failing stage, names it, and exits with its status. Run it before adding the caller: what passes here passes the workflow (on the same Ruby).
 
 `doctor` checks that `.conformance.yml` exists, is valid and sets `audit.namespace`; that `.rubocop.yml` inherits `conformance-kit: config/rubocop.yml`; and that `rubocop-thread_safety` resolves at `>= 0.8`. Each problem names its fix. `--expect X.Y` also checks the resolved `conformance-kit` is at least `X.Y`.
 
@@ -205,7 +243,7 @@ bundle exec conformance-kit config probes.gem_name
 
 ### The version handshake
 
-The behaviour a repo is held to comes from the `conformance-kit` in its lockfile; only the plumbing comes from the workflow tag. So a stale lockfile cannot pass a newer workflow vacuously, the workflow reads its own tag from `github.workflow_ref` and fails with "bump conformance-kit to ~> X.Y" when the repo resolves anything older than `X.Y`. The version is derived, never stored: a release bumps only the ruleset's `ref`. On a ref that is not a `refs/tags/v*` tag (this repo's own pull requests) the handshake is skipped with a notice. That `github.workflow_ref` carries the tag for a ruleset-required workflow is verified in the rollout pilot; until then, treat the handshake as pending validation.
+The behaviour a repo is held to comes from the `conformance-kit` in its lockfile; only the plumbing comes from the workflow tag. So that a stale lockfile cannot pass a newer workflow vacuously, the workflow reads its own tag from `job.workflow_ref` (the called workflow's ref; `github.workflow_ref` is the caller's) and fails with "bump conformance-kit to ~> X.Y" when the repo resolves anything older than `X.Y`. The version is derived, never stored. When the caller pins anything other than a `vX.Y.Z` tag (a branch, a commit SHA, or this repo's own `./` caller) the handshake is skipped with a notice.
 
 ## Development
 

@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
 
   spec.summary = "Concurrency conformance gates for Ruby gems: threads, fibers, Ractors and compiler probes."
   spec.description = "Shared RSpec examples, a per-Ractor storage shim, a class-state audit, " \
-                     "RuboCop configs and an org-required CI workflow that hold a gem to explicit " \
+                     "RuboCop configs and a reusable CI workflow that hold a gem to explicit " \
                      "thread-safe, fiber-safe and Ractor-clean tiers."
   spec.homepage = "https://github.com/zoolutions/conformance-kit"
   spec.license = "MIT"
