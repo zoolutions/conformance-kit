@@ -62,9 +62,9 @@ RSpec.describe "config/ and the conformance workflow" do
     let(:runs) { steps.filter_map { _1["run"] }.join("\n") }
     let(:probes) { jobs.fetch("probes").fetch("steps") }
 
-    it "runs on pull_request and merge_group only (the org ruleset requires it), read-only" do
+    it "is a reusable workflow only (each repo calls it), read-only, with no inputs or secrets" do
       # Psych reads the bare `on:` key as the boolean true.
-      expect(workflow.fetch(true).keys).to contain_exactly("pull_request", "merge_group")
+      expect(workflow.fetch(true)).to eq("workflow_call" => nil)
       expect(workflow.fetch("permissions")).to eq("contents" => "read")
     end
 
@@ -95,10 +95,10 @@ RSpec.describe "config/ and the conformance workflow" do
         .to include("yq '.ractor.ruby", "yq '.ractor.working_directory", "$CONFORMANCE_CONFIG")
     end
 
-    it "checks the version handshake from github.workflow_ref, then runs conformance-kit check" do
+    it "checks the version handshake from job.workflow_ref (its own tag, not the caller's), then runs check" do
       handshake = jobs.fetch("ractor").fetch("steps").find { _1["name"] == "Version handshake" }
 
-      expect(handshake.dig("env", "WORKFLOW_REF")).to eq("${{ github.workflow_ref }}")
+      expect(handshake.dig("env", "WORKFLOW_REF")).to eq("${{ job.workflow_ref }}")
       expect(handshake["run"]).to include("refs/tags/v", "bump conformance-kit to ~>")
       expect(runs).to include("bundle exec conformance-kit check")
     end
@@ -143,6 +143,16 @@ RSpec.describe "config/ and the conformance workflow" do
 
     it "keeps rubocop_spinel out of the bundle: gem-installed in the probe only" do
       expect(runs).to include("gem install rubocop_spinel --version 0.2.0")
+    end
+  end
+
+  describe ".github/workflows/conformance-self.yml" do
+    let(:caller) { load_yaml(".github/workflows/conformance-self.yml") }
+
+    it "calls conformance.yml from this checkout on pull_request and merge_group, the way a consumer would" do
+      expect(caller.fetch(true).keys).to contain_exactly("pull_request", "merge_group")
+      expect(caller.fetch("permissions")).to eq("contents" => "read")
+      expect(caller.fetch("jobs")).to eq("conformance" => { "uses" => "./.github/workflows/conformance.yml" })
     end
   end
 

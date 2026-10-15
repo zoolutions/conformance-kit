@@ -43,7 +43,7 @@ Manual gem push                          -> bin/release
 |------|--------|
 | lib/conformance_kit/checks/<check>.rb | New check — verify a violating fixture proves it fails |
 | exe/conformance-audit | Exit codes and allowlist handling are a public contract |
-| .github/workflows/conformance.yml | Org-required workflow — every enforced gem runs it at a release tag |
+| .github/workflows/conformance.yml | Reusable workflow — every adopting gem calls it at a release tag |
 
 ## Critical Issues
 
