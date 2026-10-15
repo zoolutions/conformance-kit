@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `conformance-audit` no longer crashes on a `BasicObject` value (ActiveRecord keeps one in an unresolved model's `@primary_key`): the finding names its class through `Kernel#class`.
+
 ## 0.3.0
 
 Breaking (pre-1.0): `conformance.yml` is a reusable workflow that each repo calls, instead of one an org ruleset requires. It runs on `workflow_call` only. A repo adds a caller pinned to a release tag (`uses: zoolutions/conformance-kit/.github/workflows/conformance.yml@vX.Y.Z`, see the README) and makes `conformance / Conformance settings` and `conformance / Conformance (Ruby 4.0)` required checks in its own branch ruleset. Repos outside zoolutions can use it the same way.

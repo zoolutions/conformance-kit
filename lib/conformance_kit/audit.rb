@@ -103,7 +103,8 @@ module ConformanceKit
       culprit = Shareability.culprit(value)
       return nil unless culprit
 
-      Finding.new(name: name, kind: kind, value_class: value.class.name, path: culprit.path, reason: culprit.reason)
+      Finding.new(name: name, kind: kind, value_class: core(::Kernel, :class, value).name, path: culprit.path,
+                  reason: culprit.reason)
     end
   end
 end
