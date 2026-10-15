@@ -1,0 +1,35 @@
+spec/conformance_kit/audit_spec.rb
+  s_4786a62cd35147::t_735958ad84c876 111,132-145,160-181
+lib/conformance_kit/audit.rb
+  s_4786a62cd35147::t_049ada5cf9c5eb 46-47,115,117-122
+lib/conformance_kit/audit/ancestor_rule.rb
+  s_4786a62cd35147::t_049ada5cf9c5eb 27-34,36-37,39-40,43-46,48-50,53-56
+README.md
+  s_4786a62cd35147::t_cad25abf47c6e5 155-156,158-159,164
+lib/conformance_kit/audit/allowlist.rb
+  s_4786a62cd35147::t_049ada5cf9c5eb 48-49,56-57,60,67-80,84-87,90-101,105-106,108,110-111,113-114
+spec/fixtures/audit_ancestor_fixture.rb
+  s_4786a62cd35147::t_735958ad84c876 21-25,27,29
+CHANGELOG.md
+  s_4786a62cd35147::t_cad25abf47c6e5 5
+lib/conformance_kit/config.rb
+  s_4786a62cd35147::t_049ada5cf9c5eb 120
+lib/conformance_kit/audit/cli.rb
+  s_4786a62cd35147::t_049ada5cf9c5eb 117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c37ddbca0c4041c17c826910471dd41e3767fdf2",
+  "prompts": {},
+  "sessions": {
+    "s_4786a62cd35147": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1e58604-bb1b-456c-ace0-8fe7f151dae8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
