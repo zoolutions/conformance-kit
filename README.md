@@ -16,7 +16,7 @@ Background, the finalize-at-boot pattern and the settled decisions: [zoolutions/
 ```ruby
 # Gemfile
 group :development, :test do
-  gem "conformance-kit", "~> 0.3", require: false
+  gem "conformance-kit", "~> 0.4", require: false
   gem "rubocop-thread_safety", ">= 0.8", require: false # for config/rubocop.yml
   gem "async", require: false                 # optional: runs the fiber example
 end
@@ -182,7 +182,7 @@ Turns on the six `rubocop-thread_safety` cops (`ClassAndModuleAttributes`, `Clas
 Conformance runs as **one reusable workflow in this repo**, `.github/workflows/conformance.yml`. Any repo can call it, inside zoolutions or not. A repo opts in with
 
 1. `.conformance.yml` (above),
-2. the Gemfile lines (`conformance-kit ~> 0.3`, `rubocop-thread_safety >= 0.8`),
+2. the Gemfile lines (`conformance-kit ~> 0.4`, `rubocop-thread_safety >= 0.8`),
 3. `inherit_gem: { conformance-kit: config/rubocop.yml }` in `.rubocop.yml`,
 4. a caller, pinned to a release tag:
 
@@ -199,7 +199,7 @@ permissions:
 
 jobs:
   conformance:
-    uses: zoolutions/conformance-kit/.github/workflows/conformance.yml@v0.3.0
+    uses: zoolutions/conformance-kit/.github/workflows/conformance.yml@v0.4.0
 ```
 
 To make it a merge requirement, add `conformance / Conformance settings` and `conformance / Conformance (Ruby 4.0)` to the required status checks in the repo's branch ruleset. Require both: if the settings job fails, the gate is skipped, and a skipped check does not block a merge. The prefix is the caller's job id (`conformance` above) and the Ruby is `ractor.ruby`, so the names change with either. Leave the probes out: they never fail. A repo or org that only allows selected actions must allow `zoolutions/conformance-kit/.github/workflows/conformance.yml@*`.
@@ -220,6 +220,7 @@ version: 2
 multi-ecosystem-groups:
   conformance-kit:
     schedule: { interval: weekly }
+    labels: ["dependencies", "devops"]        # your repo's own type + area labels
 updates:
   - package-ecosystem: github-actions
     directory: /
