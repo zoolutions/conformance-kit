@@ -205,25 +205,28 @@ The workflow has three jobs:
 
 ### Staying current
 
-Dependabot bumps both pins: the `uses:` tag (`github-actions`) and the gem (`bundler`), in separate pull requests. The `allow` lists keep it to the kit; drop them to have Dependabot maintain everything else too.
+Dependabot bumps both pins, the `uses:` tag (`github-actions`) and the gem (`bundler`), in **one** pull request through a multi-ecosystem group, so the version handshake never sees one without the other. The `allow` lists keep it to the kit; drop them to have Dependabot maintain everything else too.
 
 ```yaml
 # .github/dependabot.yml
 version: 2
+multi-ecosystem-groups:
+  conformance-kit:
+    schedule: { interval: weekly }
 updates:
   - package-ecosystem: github-actions
     directory: /
-    schedule: { interval: weekly }
+    multi-ecosystem-group: conformance-kit
+    patterns: ["zoolutions/conformance-kit*"]
     allow:
       - dependency-name: "zoolutions/conformance-kit*"
   - package-ecosystem: bundler
     directory: /
-    schedule: { interval: weekly }
+    multi-ecosystem-group: conformance-kit
+    patterns: ["conformance-kit"]
     allow:
       - dependency-name: conformance-kit
 ```
-
-Merge the gem bump first: after a minor or major release the workflow bump fails the version handshake until the lockfile has caught up.
 
 ### `conformance-kit check`, the local equivalent
 
