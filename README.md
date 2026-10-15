@@ -205,21 +205,28 @@ The workflow has three jobs:
 
 ### Staying current
 
-Dependabot bumps both pins: the `uses:` tag (`github-actions`) and the gem (`bundler`), in separate pull requests.
+Dependabot bumps both pins, the `uses:` tag (`github-actions`) and the gem (`bundler`), in **one** pull request through a multi-ecosystem group. It can still open one with a single pin when only one ecosystem has an update so far (the tag is out but RubyGems hasn't published the gem yet): the version handshake then fails that pull request until the other pin catches up, so check both before merging. The `allow` lists keep it to the kit; drop them to have Dependabot maintain everything else too.
 
 ```yaml
 # .github/dependabot.yml
 version: 2
+multi-ecosystem-groups:
+  conformance-kit:
+    schedule: { interval: weekly }
 updates:
   - package-ecosystem: github-actions
     directory: /
-    schedule: { interval: weekly }
+    multi-ecosystem-group: conformance-kit
+    patterns: ["zoolutions/conformance-kit*"]
+    allow:
+      - dependency-name: "zoolutions/conformance-kit*"
   - package-ecosystem: bundler
     directory: /
-    schedule: { interval: weekly }
+    multi-ecosystem-group: conformance-kit
+    patterns: ["conformance-kit"]
+    allow:
+      - dependency-name: conformance-kit
 ```
-
-Merge the gem bump first: after a minor or major release the workflow bump fails the version handshake until the lockfile has caught up.
 
 ### `conformance-kit check`, the local equivalent
 
@@ -243,7 +250,7 @@ bundle exec conformance-kit config probes.gem_name
 
 ### The version handshake
 
-The behaviour a repo is held to comes from the `conformance-kit` in its lockfile; only the plumbing comes from the workflow tag. So that a stale lockfile cannot pass a newer workflow vacuously, the workflow reads its own tag from `job.workflow_ref` (the called workflow's ref; `github.workflow_ref` is the caller's) and fails with "bump conformance-kit to ~> X.Y" when the repo resolves anything older than `X.Y`. The version is derived, never stored. When the caller pins anything other than a `vX.Y.Z` tag (a branch, a commit SHA, or this repo's own `./` caller) the handshake is skipped with a notice, and so it is on GitHub Enterprise Server, which has no `job.workflow_ref`. That a tag-pinned call carries the tag is GitHub's documented behaviour; it has not been seen on a run yet, since v0.3.0 is the first tag that can be called. Until it has, treat the handshake as pending validation.
+The behaviour a repo is held to comes from the `conformance-kit` in its lockfile; only the plumbing comes from the workflow tag. So that a stale lockfile cannot pass a newer workflow vacuously, the workflow reads its own tag from `job.workflow_ref` (the called workflow's ref; `github.workflow_ref` is the caller's) and fails with "bump conformance-kit to ~> X.Y" when the repo resolves anything older than `X.Y`. The version is derived, never stored. When the caller pins anything other than a `vX.Y.Z` tag (a branch, a commit SHA, or this repo's own `./` caller) the handshake is skipped with a notice, and so it is on GitHub Enterprise Server, which has no `job.workflow_ref`.
 
 ## Development
 
