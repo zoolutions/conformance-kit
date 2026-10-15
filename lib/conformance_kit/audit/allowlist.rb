@@ -101,7 +101,13 @@ module ConformanceKit
         raise AllowlistError, "#{source}: #{entry['name']}: ivars: only goes with an ancestor:"
       end
 
+      CONSTANT_PATH = /\A(?:::)?[A-Z]\w*(?:::[A-Z]\w*)*\z/
+      private_constant :CONSTANT_PATH
+
       def validate_ancestor(entry, ancestor, source)
+        unless ancestor.match?(CONSTANT_PATH)
+          raise AllowlistError, "#{source}: ancestor #{ancestor.inspect} is not a constant path (e.g. Rails::Engine)"
+        end
         if EVERY_MODULE.include?(ancestor.delete_prefix("::"))
           raise AllowlistError, "#{source}: ancestor #{ancestor} matches every module: name the framework's own class"
         end

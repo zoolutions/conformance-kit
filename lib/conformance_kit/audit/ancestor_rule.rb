@@ -28,16 +28,15 @@ module ConformanceKit
       # defined, or only a declared autoload (never loaded here: loading it
       # mid-audit would change what is being audited). A nil rule covers
       # nothing and is listed as stale. Called once per audit, after audit.require.
+      #
+      # Raises AllowlistError when the path resolves to a module every module
+      # has (Object::Kernel is Kernel): the name check alone can't see aliases.
       def resolve
-        ancestor.split("::").reduce(Object) do |scope, segment|
-          return nil unless core(::Module, :const_defined?, scope, segment, false)
-          return nil if core(::Module, :autoload?, scope, segment, false)
+        target = walk
+        return target unless target && EVERY_MODULE.any? { target.equal?(_1) }
 
-          value = core(::Module, :const_get, scope, segment, false)
-          return nil unless ::Module === value # rubocop:disable Style/CaseEquality -- a BasicObject has no is_a?
-
-          value
-        end
+        raise AllowlistError, "ancestor #{ancestor} resolves to #{target}, which every module has: " \
+                              "name the framework's own class"
       end
 
       # Whether this rule covers +ivar+ on +mod+, given its resolved +target+.
@@ -50,7 +49,22 @@ module ConformanceKit
         end
       end
 
+      EVERY_MODULE = [::BasicObject, ::Object, ::Kernel, ::Module, ::Class].freeze
+      private_constant :EVERY_MODULE
+
       private
+
+      def walk
+        ancestor.split("::").reduce(Object) do |scope, segment|
+          return nil unless core(::Module, :const_defined?, scope, segment, false)
+          return nil if core(::Module, :autoload?, scope, segment, false)
+
+          value = core(::Module, :const_get, scope, segment, false)
+          return nil unless ::Module === value # rubocop:disable Style/CaseEquality -- a BasicObject has no is_a?
+
+          value
+        end
+      end
 
       # The core reflection methods, bound directly, as in Audit.
       def core(owner, method, receiver, *) = owner.instance_method(method).bind_call(receiver, *)

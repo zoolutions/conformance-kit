@@ -171,6 +171,20 @@ RSpec.describe ConformanceKit::Audit do
       end
     end
 
+    it "rejects an ancestor that is not a constant path" do
+      ["Object::", "::", "Foo::::Bar", "foo", "Foo Bar"].each do |path|
+        expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => path, "reason" => "r" }]) }
+          .to raise_error(ConformanceKit::Audit::AllowlistError, /not a constant path/)
+      end
+    end
+
+    it "rejects, at audit time, an ancestor path that resolves to a module every module has" do
+      allowlist = ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "Object::Kernel", "reason" => "r" }])
+
+      expect { audit(allowlist: allowlist).findings }
+        .to raise_error(ConformanceKit::Audit::AllowlistError, /Object::Kernel resolves to Kernel.*every module/)
+    end
+
     it "rejects an unknown key, so a typo cannot widen a rule" do
       expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "C", "ivar" => ["@x"], "reason" => "r" }]) }
         .to raise_error(ConformanceKit::Audit::AllowlistError, /unknown key ivar/)
