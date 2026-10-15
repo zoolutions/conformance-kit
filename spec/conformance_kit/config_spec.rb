@@ -92,6 +92,24 @@ RSpec.describe ConformanceKit::Config do
         .to eq(["MyGem::LOCK"])
     end
 
+    it "reads main_only ancestor: rules beside name: entries" do
+      config = load_yaml(<<~YAML)
+        main_only:
+          - name: MyGem::LOCK
+            reason: main-only
+          - ancestor: Rails::Engine
+            ivars: ["@called_from"]
+            reason: Rails::Engine's own class state
+      YAML
+
+      expect(config.allowlist.names).to eq(["MyGem::LOCK"])
+      expect(config.allowlist.ancestor_rules.map(&:label)).to eq(["ancestor Rails::Engine (@called_from)"])
+    end
+
+    it "rejects an ancestor: rule without a reason" do
+      expect(error_for("main_only:\n  - ancestor: Rails::Engine\n")).to include("ancestor Rails::Engine", "reason")
+    end
+
     it "is empty for a missing file" do
       config = described_class.load(File.join(Dir.tmpdir, "no-such-dir", ".conformance.yml"))
 

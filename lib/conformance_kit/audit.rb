@@ -12,7 +12,8 @@ module ConformanceKit
   # eager-load) everything the audit should see, and list deliberate exceptions
   # in `skip_autoloads` (`audit.skip_autoloads:` in .conformance.yml).
   class Audit
-    Finding = Data.define(:name, :kind, :value_class, :path, :reason) do
+    # +rule+: the main_only ancestor: rule that covers it, or nil.
+    Finding = Data.define(:name, :kind, :value_class, :path, :reason, :rule) do
       def to_s
         where = path.empty? ? "" : " #{path} is"
         "#{name} (#{kind}) #{value_class}:#{where} #{reason}"
@@ -42,10 +43,16 @@ module ConformanceKit
     # Skipped autoloads not listed in skip_autoloads: what strict_autoloads fails on.
     def unexpected_autoloads = skipped_autoloads - @skip_autoloads.names
 
-    # Allowlisted names inside the audited namespaces that no longer turn up.
+    # Why an allowlisted finding is main-only: its own name: entry's reason, else its ancestor: rule's.
+    def reason_for(finding) = @allowlist.reason_for(finding.name) || finding.rule&.reason
+
+    # Allowlisted names inside the audited namespaces that no longer turn up,
+    # and ancestor: rules that covered nothing.
     def stale
       found = scan.map(&:name)
-      @allowlist.names.select { in_namespace?(_1) && !found.include?(_1) }
+      used = scan.filter_map(&:rule)
+      @allowlist.names.select { in_namespace?(_1) && !found.include?(_1) } +
+        @allowlist.ancestor_rules.reject { |rule| used.any? { _1.equal?(rule) } }.map(&:label)
     end
 
     # skip_autoloads names inside the audited namespaces that are no longer unloaded autoloads.
@@ -57,7 +64,7 @@ module ConformanceKit
     private
 
     def partitioned
-      @partitioned ||= scan.partition { !@allowlist.include?(_1.name) }
+      @partitioned ||= scan.partition { !_1.rule && !@allowlist.include?(_1.name) }
     end
 
     def scan
@@ -82,14 +89,14 @@ module ConformanceKit
       constants_of(mod).filter_map do |constant|
         next if autoload?(mod, constant)
 
-        finding("#{name}::#{constant}", "constant", core(::Module, :const_get, mod, constant, false))
+        finding("#{name}::#{constant}", "constant", core(::Module, :const_get, mod, constant, false), nil)
       end
     end
 
     def ivar_findings(mod, name)
       core(::Kernel, :instance_variables, mod).filter_map do |ivar|
         kind = mod.is_a?(Class) ? "class ivar" : "module ivar"
-        finding("#{name}.#{ivar}", kind, core(::Kernel, :instance_variable_get, mod, ivar))
+        finding("#{name}.#{ivar}", kind, core(::Kernel, :instance_variable_get, mod, ivar), mod, ivar)
       end
     end
 
@@ -99,12 +106,19 @@ module ConformanceKit
     def constants_of(mod) = core(::Module, :constants, mod, false)
     def autoload?(mod, constant) = core(::Module, :autoload?, mod, constant)
 
-    def finding(name, kind, value)
+    # +mod+ and +ivar+ (an ivar finding only) are what an ancestor: rule matches on.
+    def finding(name, kind, value, mod, ivar = nil)
       culprit = Shareability.culprit(value)
       return nil unless culprit
 
       Finding.new(name: name, kind: kind, value_class: core(::Kernel, :class, value).name, path: culprit.path,
-                  reason: culprit.reason)
+                  reason: culprit.reason, rule: ivar && rule_for(mod, ivar))
     end
+
+    # The first ancestor: rule covering +ivar+ on +mod+, or nil.
+    def rule_for(mod, ivar) = rule_targets.find { |rule, target| target && rule.covers?(mod, ivar, target) }&.first
+
+    # Each ancestor: rule with the module it names, resolved once, after audit.require.
+    def rule_targets = @rule_targets ||= @allowlist.ancestor_rules.map { [_1, _1.resolve] }
   end
 end

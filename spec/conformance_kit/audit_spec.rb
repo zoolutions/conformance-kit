@@ -90,6 +90,121 @@ RSpec.describe ConformanceKit::Audit do
       end
     end
 
+    describe "an ancestor: rule (framework state on the gem's subclasses)" do
+      before { require_relative "../fixtures/audit_ancestor_fixture" }
+
+      def ancestor_audit(*entries)
+        audit(namespaces: ["AuditAncestorFixture"], allowlist: ConformanceKit::Audit::Allowlist.new(entries))
+      end
+
+      def rule(ancestor, ivars: nil)
+        { "ancestor" => ancestor, "reason" => "the framework's own class state" }
+          .merge(ivars ? { "ivars" => ivars } : {})
+      end
+
+      it "allowlists every ivar on a subclass of the ancestor, but never a constant" do
+        result = ancestor_audit(rule("AuditFrameworkBase"))
+
+        expect(result.allowlisted.map(&:name))
+          .to contain_exactly("AuditAncestorFixture::Model.@columns", "AuditAncestorFixture::Model.@own_cache")
+        expect(result.findings.map(&:name)).to contain_exactly("AuditAncestorFixture::Concern.@deps",
+                                                               "AuditAncestorFixture::Model::TABLE")
+      end
+
+      it "keeps the gem's own state reported when ivars: names the framework's" do
+        result = ancestor_audit(rule("AuditFrameworkBase", ivars: ["@columns"]))
+
+        expect(result.allowlisted.map(&:name)).to eq(["AuditAncestorFixture::Model.@columns"])
+        expect(result.findings.map(&:name)).to include("AuditAncestorFixture::Model.@own_cache")
+      end
+
+      it "matches a module extended with the ancestor" do
+        expect(ancestor_audit(rule("AuditFrameworkConcern")).allowlisted.map(&:name))
+          .to eq(["AuditAncestorFixture::Concern.@deps"])
+      end
+
+      it "gives the rule's reason for what it allowlisted" do
+        result = ancestor_audit(rule("AuditFrameworkBase", ivars: ["@columns"]))
+
+        expect(result.reason_for(result.allowlisted.first)).to eq("the framework's own class state")
+      end
+
+      it "prefers a name: entry's own reason over the rule's" do
+        own = { "name" => "AuditAncestorFixture::Model.@own_cache", "reason" => "the model's own cache" }
+        result = ancestor_audit(rule("AuditFrameworkBase"), own)
+
+        expect(result.reason_for(result.allowlisted.find { _1.name.end_with?("@own_cache") }))
+          .to eq("the model's own cache")
+      end
+
+      it "treats an ancestor that is only a declared autoload as stale, without loading it" do
+        expect(ancestor_audit(rule("AuditAutoloadFramework::Base")).stale)
+          .to eq(["ancestor AuditAutoloadFramework::Base"])
+        expect(AuditAutoloadFramework.autoload?(:Base)).to be_truthy
+      end
+
+      it "lists a rule that matched nothing, or names no loaded constant, as stale" do
+        result = ancestor_audit(rule("AuditFrameworkBase", ivars: ["@gone"]), rule("NoSuchFramework::Base"))
+
+        expect(result.stale).to contain_exactly("ancestor AuditFrameworkBase (@gone)", "ancestor NoSuchFramework::Base")
+      end
+    end
+
+    it "rejects an entry with both name: and ancestor:, or with neither" do
+      [{ "name" => "A::B", "ancestor" => "C", "reason" => "r" }, { "reason" => "r" }].each do |entry|
+        expect { ConformanceKit::Audit::Allowlist.new([entry]) }
+          .to raise_error(ConformanceKit::Audit::AllowlistError, /name: or an ancestor:/)
+      end
+    end
+
+    it "rejects ivars: that are not a non-empty list of @names" do
+      [["columns"], [], "@columns"].each do |ivars|
+        expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "C", "ivars" => ivars, "reason" => "r" }]) }
+          .to raise_error(ConformanceKit::Audit::AllowlistError, /ivars: must be a non-empty list of @names/)
+      end
+    end
+
+    it "rejects an ancestor that every module has" do
+      %w[Object ::Module Kernel BasicObject Class].each do |core|
+        expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => core, "reason" => "r" }]) }
+          .to raise_error(ConformanceKit::Audit::AllowlistError, /matches every/)
+      end
+    end
+
+    it "rejects an ancestor that is not a constant path" do
+      ["Object::", "::", "Foo::::Bar", "foo", "Foo Bar"].each do |path|
+        expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => path, "reason" => "r" }]) }
+          .to raise_error(ConformanceKit::Audit::AllowlistError, /not a constant path/)
+      end
+    end
+
+    it "accepts a constant path with Unicode identifiers" do
+      expect(ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "Ärger::Basis", "reason" => "r" }]).ancestor_rules
+        .map(&:ancestor)).to eq(["Ärger::Basis"])
+    end
+
+    it "rejects, at audit time, an ancestor path that resolves to a module every module has" do
+      allowlist = ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "Object::Kernel", "reason" => "r" }])
+
+      expect { audit(allowlist: allowlist).findings }
+        .to raise_error(ConformanceKit::Audit::AllowlistError, /Object::Kernel resolves to Kernel.*every module/)
+    end
+
+    it "rejects an unknown key, so a typo cannot widen a rule" do
+      expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "C", "ivar" => ["@x"], "reason" => "r" }]) }
+        .to raise_error(ConformanceKit::Audit::AllowlistError, /unknown key ivar/)
+    end
+
+    it "rejects a blank ancestor: beside a name:" do
+      expect { ConformanceKit::Audit::Allowlist.new([{ "name" => "A::B", "ancestor" => nil, "reason" => "r" }]) }
+        .to raise_error(ConformanceKit::Audit::AllowlistError, /name: or an ancestor:/)
+    end
+
+    it "keeps audit.skip_autoloads to name: entries" do
+      expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "C", "reason" => "r" }], key: "audit.skip_autoloads") }
+        .to raise_error(ConformanceKit::Audit::AllowlistError, /audit.skip_autoloads.*name:/)
+    end
+
     it "lists stale entries inside the audited namespace" do
       allowlist = ConformanceKit::Audit::Allowlist.new([{ "name" => "AuditFixture::GONE", "reason" => "removed" },
                                                         { "name" => "Elsewhere::X", "reason" => "other gem" }])
