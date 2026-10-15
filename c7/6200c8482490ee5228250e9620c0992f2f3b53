@@ -1,0 +1,11 @@
+CHANGELOG.md
+  ai_agent 5
+lib/conformance_kit/store.rb
+  ai_agent 12-15,39-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c76200c8482490ee5228250e9620c0992f2f3b53",
+  "prompts": {}
+}
