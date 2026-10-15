@@ -56,6 +56,16 @@ RSpec.describe ConformanceKit::Audit do
         .to eq(["AuditSneakyFixture.@hooks", "AuditSneakyFixture::LOCK"])
     end
 
+    it "names a BasicObject value's class instead of crashing on it" do
+      # ActiveRecord parks BasicObject.new in an unresolved model's @primary_key.
+      stub_const("AuditBasicObjectFixture", Class.new do
+        instance_variable_set(:@primary_key, BasicObject.new)
+      end)
+
+      expect(audit(namespaces: ["AuditBasicObjectFixture"]).findings.map(&:to_s))
+        .to contain_exactly(a_string_including("AuditBasicObjectFixture.@primary_key (class ivar) BasicObject"))
+    end
+
     it "stays inside the namespace" do
       expect(audit(namespaces: ["AuditFixture::Hooks"]).findings.map(&:name)).to eq(["AuditFixture::Hooks.@on_save"])
     end

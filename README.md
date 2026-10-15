@@ -156,7 +156,7 @@ main_only:
 
 `main_only:` is state that is deliberately main-only: every entry needs a `reason:`. Entries inside the audited namespaces that no longer turn up are listed as stale, and so are `audit.skip_autoloads` entries that are no longer unloaded autoloads.
 
-`strict_autoloads: true` needs `audit.require` to load everything, e.g. a file that calls your Zeitwerk loader's `eager_load!`.
+`strict_autoloads: true` needs `audit.require` to load everything, e.g. a file that calls your Zeitwerk loader's `eager_load!`. In a Rails engine, `MyGem::Engine.eager_load!` is a no-op (Rails 7+): call `Zeitwerk::Loader.eager_load_namespace(MyGem)` after booting the dummy app instead, and reference constants in `autoload_once_paths` explicitly.
 
 ## RuboCop
 
