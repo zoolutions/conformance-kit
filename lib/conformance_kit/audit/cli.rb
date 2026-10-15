@@ -112,7 +112,7 @@ module ConformanceKit
       end
 
       def details(audit, strict_autoloads)
-        allowlisted = audit.allowlisted.map { "#{_1.name} — #{audit.allowlist.reason_for(_1.name)}" }
+        allowlisted = audit.allowlisted.map { "#{_1.name} — #{audit.reason_for(_1)}" }
         section("allowlisted main-only:", allowlisted)
         section("stale allowlist entries (no longer found):", audit.stale)
         skipped = audit.skipped_autoloads - audit.unexpected_autoloads
