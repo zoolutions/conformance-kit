@@ -1,0 +1,32 @@
+.github/workflows/conformance-self.yml
+  s_4786a62cd35147::t_937134df60c322 1-15
+conformance-kit.gemspec
+  s_4786a62cd35147::t_f93b6181639232 13
+.github/workflows/conformance.yml
+  s_4786a62cd35147::t_937134df60c322 3,6,9,82-83,86
+  s_4786a62cd35147::t_15042c2ba900a8 4
+spec/conformance_kit/configs_and_workflows_spec.rb
+  s_4786a62cd35147::t_75f11b10ca67d4 65,67,98,101,149-155
+.claude/commands/review-pr.md
+  s_4786a62cd35147::t_7b749917d61701 46
+CHANGELOG.md
+  s_4786a62cd35147::t_f93b6181639232 3-9
+README.md
+  s_4786a62cd35147::t_f93b6181639232 19,175,178-180,182-200,202,206-223,232,246
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "63086dc51c5e5936c1dc5ff7ef302d7b4532b172",
+  "prompts": {},
+  "sessions": {
+    "s_4786a62cd35147": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1e58604-bb1b-456c-ace0-8fe7f151dae8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
