@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - `main_only:` takes `ancestor:` rules (with optional `ivars:`): framework class state on the gem's own subclasses (ActiveRecord, ActionController, Rails::Engine, ActiveSupport::Concern, ...) in one entry per framework instead of one per ivar per class. Constants are never covered; unused rules are listed as stale; an entry with an unknown key, or an ancestor every module has (`Object`, `Module`, ...), is a config error. `Audit::Finding` gains a `rule` member (the covering rule, or nil).
 - `conformance-audit` no longer crashes on a `BasicObject` value (ActiveRecord keeps one in an unresolved model's `@primary_key`): the finding names its class through `Kernel#class`.
