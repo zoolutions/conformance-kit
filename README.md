@@ -205,7 +205,7 @@ The workflow has three jobs:
 
 ### Staying current
 
-Dependabot bumps both pins, the `uses:` tag (`github-actions`) and the gem (`bundler`), in **one** pull request through a multi-ecosystem group, so the version handshake never sees one without the other. The `allow` lists keep it to the kit; drop them to have Dependabot maintain everything else too.
+Dependabot bumps both pins, the `uses:` tag (`github-actions`) and the gem (`bundler`), in **one** pull request through a multi-ecosystem group. It can still open one with a single pin when only one ecosystem has an update so far (the tag is out but RubyGems hasn't published the gem yet): the version handshake then fails that pull request until the other pin catches up, so check both before merging. The `allow` lists keep it to the kit; drop them to have Dependabot maintain everything else too.
 
 ```yaml
 # .github/dependabot.yml
