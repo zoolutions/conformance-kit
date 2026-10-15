@@ -18,10 +18,15 @@ module AuditFrameworkConcern
   end
 end
 
-module AuditAncestorFixture
-  TABLE = [] # rubocop:disable Style/MutableConstant -- the gem's own constant an ancestor rule must not cover
+# A framework constant that is declared but never loaded: a rule naming it is
+# stale, and the audit must not load it to find out.
+module AuditAutoloadFramework
+  autoload :Base, "/nonexistent/audit_autoload_framework_base"
+end
 
+module AuditAncestorFixture
   class Model < AuditFrameworkBase
+    TABLE = [] # rubocop:disable Style/MutableConstant -- the gem's own constant on a covered class
     @own_cache = {}
   end
 

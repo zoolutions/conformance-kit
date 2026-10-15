@@ -24,28 +24,36 @@ module ConformanceKit
 
       def label = ivars ? "ancestor #{ancestor} (#{ivars.join(', ')})" : "ancestor #{ancestor}"
 
-      def match?(mod, ivar)
+      # The loaded module +ancestor+ names, or nil when it isn't loaded: not
+      # defined, or only a declared autoload (never loaded here: loading it
+      # mid-audit would change what is being audited). A nil rule covers
+      # nothing and is listed as stale. Called once per audit, after audit.require.
+      def resolve
+        ancestor.split("::").reduce(Object) do |scope, segment|
+          return nil unless core(::Module, :const_defined?, scope, segment, false)
+          return nil if core(::Module, :autoload?, scope, segment, false)
+
+          value = core(::Module, :const_get, scope, segment, false)
+          return nil unless ::Module === value # rubocop:disable Style/CaseEquality -- a BasicObject has no is_a?
+
+          value
+        end
+      end
+
+      # Whether this rule covers +ivar+ on +mod+, given its resolved +target+.
+      def covers?(mod, ivar, target)
         return false if ivars && !ivars.include?(ivar.to_s)
+        return false if target.equal?(mod)
 
-        target = resolve
-        return false unless target && !target.equal?(mod)
-
-        ancestors_of(mod).include?(target) || ancestors_of(singleton_of(mod)).include?(target)
+        [mod, core(::Kernel, :singleton_class, mod)].any? do |owner|
+          core(::Module, :ancestors, owner).any? { _1.equal?(target) }
+        end
       end
 
       private
 
-      # Unloaded (the framework isn't in this bundle): the rule matches nothing
-      # and the audit lists it as stale.
-      def resolve
-        value = Object.const_get(ancestor)
-        value if value.is_a?(Module)
-      rescue NameError
-        nil
-      end
-
-      def ancestors_of(mod) = ::Module.instance_method(:ancestors).bind_call(mod)
-      def singleton_of(mod) = ::Kernel.instance_method(:singleton_class).bind_call(mod)
+      # The core reflection methods, bound directly, as in Audit.
+      def core(owner, method, receiver, *) = owner.instance_method(method).bind_call(receiver, *)
     end
   end
 end

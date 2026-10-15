@@ -117,7 +117,7 @@ module ConformanceKit
       string: "a string (quote it)",
       boolean: "true or false",
       string_map: "a mapping of names to string values (quote numbers)",
-      entries: "a list of name:/reason: entries"
+      entries: "a list of name:/reason: (or, in main_only, ancestor:/reason:) entries"
     }.freeze
     private_constant :EXPECTED
 

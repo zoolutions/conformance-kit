@@ -43,8 +43,8 @@ module ConformanceKit
     # Skipped autoloads not listed in skip_autoloads: what strict_autoloads fails on.
     def unexpected_autoloads = skipped_autoloads - @skip_autoloads.names
 
-    # Why an allowlisted finding is main-only: its name: entry's or its ancestor: rule's reason.
-    def reason_for(finding) = finding.rule ? finding.rule.reason : @allowlist.reason_for(finding.name)
+    # Why an allowlisted finding is main-only: its own name: entry's reason, else its ancestor: rule's.
+    def reason_for(finding) = @allowlist.reason_for(finding.name) || finding.rule&.reason
 
     # Allowlisted names inside the audited namespaces that no longer turn up,
     # and ancestor: rules that covered nothing.
@@ -112,7 +112,13 @@ module ConformanceKit
       return nil unless culprit
 
       Finding.new(name: name, kind: kind, value_class: core(::Kernel, :class, value).name, path: culprit.path,
-                  reason: culprit.reason, rule: ivar && @allowlist.rule_for(mod, ivar))
+                  reason: culprit.reason, rule: ivar && rule_for(mod, ivar))
     end
+
+    # The first ancestor: rule covering +ivar+ on +mod+, or nil.
+    def rule_for(mod, ivar) = rule_targets.find { |rule, target| target && rule.covers?(mod, ivar, target) }&.first
+
+    # Each ancestor: rule with the module it names, resolved once, after audit.require.
+    def rule_targets = @rule_targets ||= @allowlist.ancestor_rules.map { [_1, _1.resolve] }
   end
 end

@@ -45,45 +45,73 @@ module ConformanceKit
       def include?(name) = names.include?(name)
       def reason_for(name) = entries.find { _1["name"] == name }&.fetch("reason")
 
-      # The first ancestor: rule covering +ivar+ on +mod+, or nil.
-      def rule_for(mod, ivar) = ancestor_rules.find { _1.match?(mod, ivar) }
+      # Ancestors every module has: a rule naming one would cover every ivar.
+      EVERY_MODULE = %w[BasicObject Object Kernel Module Class].freeze
 
       private
 
       def validate(entry, source)
         unless entry.is_a?(Hash)
           raise AllowlistError,
-                "#{source}: each #{@key} entry needs a name: and a reason:, got #{entry.inspect}"
+                "#{source}: each #{@key} entry needs a name: (or, in main_only, an ancestor:) and a reason:, " \
+                "got #{entry.inspect}"
         end
 
+        validate_keys(entry, source)
         label = validate_target(entry, source)
         raise AllowlistError, "#{source}: #{label} has no reason: (say why it is safe)" if blank?(entry["reason"])
 
         entry
       end
 
+      # Every key is known, so a typo (ivar: for ivars:) cannot quietly widen a rule.
+      def validate_keys(entry, source)
+        if @key != "main_only" && entry.key?("ancestor")
+          raise AllowlistError, "#{source}: #{@key} entries take a name:, not an ancestor: (#{entry['ancestor']})"
+        end
+
+        known = @key == "main_only" ? %w[name ancestor ivars reason] : %w[name reason]
+        unknown = entry.keys - known
+        return if unknown.empty?
+
+        raise AllowlistError, "#{source}: a #{@key} entry has an unknown key #{unknown.first} " \
+                              "(one of #{known.join(', ')}): #{entry.inspect}"
+      end
+
       # An entry names one constant or ivar (name:), or, in main_only, a
       # framework ancestor (ancestor:, optional ivars:). Returns its label.
       def validate_target(entry, source)
-        name, ancestor = entry.values_at("name", "ancestor")
-        if blank?(name) == blank?(ancestor)
-          raise AllowlistError, "#{source}: each #{@key} entry needs a name: or an ancestor: (#{entry.inspect})"
+        targets = %w[name ancestor].select { entry.key?(_1) }
+        unless targets.size == 1
+          raise AllowlistError, "#{source}: each #{@key} entry needs a name: or an ancestor:, not both " \
+                                "(#{entry.inspect})"
         end
-        return name if blank?(ancestor)
 
-        validate_ancestor(entry, ancestor, source)
-        "ancestor #{ancestor}"
+        key = targets.first
+        raise AllowlistError, "#{source}: a #{@key} entry has a blank #{key}: (#{entry.inspect})" if blank?(entry[key])
+        return validate_name(entry, source) if key == "name"
+
+        validate_ancestor(entry, entry["ancestor"], source)
+        "ancestor #{entry['ancestor']}"
+      end
+
+      def validate_name(entry, source)
+        return entry["name"] unless entry.key?("ivars")
+
+        raise AllowlistError, "#{source}: #{entry['name']}: ivars: only goes with an ancestor:"
       end
 
       def validate_ancestor(entry, ancestor, source)
-        unless @key == "main_only"
-          raise AllowlistError, "#{source}: #{@key} entries take a name:, not an ancestor: (#{ancestor})"
+        if EVERY_MODULE.include?(ancestor.delete_prefix("::"))
+          raise AllowlistError, "#{source}: ancestor #{ancestor} matches every module: name the framework's own class"
         end
+        return unless entry.key?("ivars")
 
-        ivars = entry.fetch("ivars", [])
-        return if ivars.is_a?(Array) && ivars.all? { _1.is_a?(String) && _1.match?(/\A@\w+\z/) }
+        ivars = entry["ivars"]
+        return if ivars.is_a?(Array) && !ivars.empty? && ivars.all? { _1.is_a?(String) && _1.match?(/\A@\w+\z/) }
 
-        raise AllowlistError, "#{source}: ancestor #{ancestor}: ivars: must be a list of @names, got #{ivars.inspect}"
+        raise AllowlistError,
+              "#{source}: ancestor #{ancestor}: ivars: must be a non-empty list of @names, got #{ivars.inspect}"
       end
 
       def blank?(value) = !value.is_a?(String) || value.strip.empty?

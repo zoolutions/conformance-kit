@@ -108,7 +108,7 @@ RSpec.describe ConformanceKit::Audit do
         expect(result.allowlisted.map(&:name))
           .to contain_exactly("AuditAncestorFixture::Model.@columns", "AuditAncestorFixture::Model.@own_cache")
         expect(result.findings.map(&:name)).to contain_exactly("AuditAncestorFixture::Concern.@deps",
-                                                               "AuditAncestorFixture::TABLE")
+                                                               "AuditAncestorFixture::Model::TABLE")
       end
 
       it "keeps the gem's own state reported when ivars: names the framework's" do
@@ -129,6 +129,20 @@ RSpec.describe ConformanceKit::Audit do
         expect(result.reason_for(result.allowlisted.first)).to eq("the framework's own class state")
       end
 
+      it "prefers a name: entry's own reason over the rule's" do
+        own = { "name" => "AuditAncestorFixture::Model.@own_cache", "reason" => "the model's own cache" }
+        result = ancestor_audit(rule("AuditFrameworkBase"), own)
+
+        expect(result.reason_for(result.allowlisted.find { _1.name.end_with?("@own_cache") }))
+          .to eq("the model's own cache")
+      end
+
+      it "treats an ancestor that is only a declared autoload as stale, without loading it" do
+        expect(ancestor_audit(rule("AuditAutoloadFramework::Base")).stale)
+          .to eq(["ancestor AuditAutoloadFramework::Base"])
+        expect(AuditAutoloadFramework.autoload?(:Base)).to be_truthy
+      end
+
       it "lists a rule that matched nothing, or names no loaded constant, as stale" do
         result = ancestor_audit(rule("AuditFrameworkBase", ivars: ["@gone"]), rule("NoSuchFramework::Base"))
 
@@ -143,9 +157,28 @@ RSpec.describe ConformanceKit::Audit do
       end
     end
 
-    it "rejects ivars: that are not a list of @names" do
-      expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "C", "ivars" => ["columns"], "reason" => "r" }]) }
-        .to raise_error(ConformanceKit::Audit::AllowlistError, /ivars: must be a list of @names/)
+    it "rejects ivars: that are not a non-empty list of @names" do
+      [["columns"], [], "@columns"].each do |ivars|
+        expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "C", "ivars" => ivars, "reason" => "r" }]) }
+          .to raise_error(ConformanceKit::Audit::AllowlistError, /ivars: must be a non-empty list of @names/)
+      end
+    end
+
+    it "rejects an ancestor that every module has" do
+      %w[Object ::Module Kernel BasicObject Class].each do |core|
+        expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => core, "reason" => "r" }]) }
+          .to raise_error(ConformanceKit::Audit::AllowlistError, /matches every/)
+      end
+    end
+
+    it "rejects an unknown key, so a typo cannot widen a rule" do
+      expect { ConformanceKit::Audit::Allowlist.new([{ "ancestor" => "C", "ivar" => ["@x"], "reason" => "r" }]) }
+        .to raise_error(ConformanceKit::Audit::AllowlistError, /unknown key ivar/)
+    end
+
+    it "rejects a blank ancestor: beside a name:" do
+      expect { ConformanceKit::Audit::Allowlist.new([{ "name" => "A::B", "ancestor" => nil, "reason" => "r" }]) }
+        .to raise_error(ConformanceKit::Audit::AllowlistError, /name: or an ancestor:/)
     end
 
     it "keeps audit.skip_autoloads to name: entries" do

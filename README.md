@@ -152,16 +152,16 @@ main_only:
     reason: guards boot-time registration; no non-main Ractor ever registers
   - name: MyGem::LOCK                          # constant: Owner::NAME
     reason: ...
-  - ancestor: ActiveRecord::Base               # framework state on the gem's own subclasses
-    reason: ActiveRecord's own class state, set by Rails at boot on the main Ractor
-  - ancestor: Rails::Engine
-    ivars: ["@called_from", "@initializers"]   # optional: only these ivars
+  - ancestor: Rails::Engine                    # framework state on the gem's own subclasses
+    ivars: ["@called_from", "@initializers", "@instance"]  # only the framework's ivars
     reason: Rails::Engine's own class state, set by Rails at boot on the main Ractor
+  - ancestor: ActionController::Base           # without ivars: every ivar on its subclasses
+    reason: ActionController's own class state, set by Rails on the main Ractor
 ```
 
 `main_only:` is state that is deliberately main-only: every entry needs a `reason:`. Entries inside the audited namespaces that no longer turn up are listed as stale, and so are `audit.skip_autoloads` entries that are no longer unloaded autoloads.
 
-An `ancestor:` entry covers the class state a framework keeps on the gem's own classes, which would otherwise take one `name:` entry per ivar per class (a Rails engine easily needs a hundred): every class/module ivar on a module that inherits from, includes or is extended with that constant. It never covers a constant, and `ivars:` narrows it to the framework's own ivars, so state the gem keeps on the same classes is still audited; without `ivars:`, that state is allowlisted too. A rule that covered nothing, or whose constant isn't loaded, is listed as stale. `audit.skip_autoloads` takes `name:` entries only.
+An `ancestor:` entry covers the class state a framework keeps on the gem's own classes, which would otherwise take one `name:` entry per ivar per class (a Rails engine easily needs a hundred): every class/module ivar on a module that inherits from, includes or is extended with that constant. It never covers a constant. Prefer `ivars:`: it narrows the rule to the framework's own ivars, so state the gem keeps on the same classes is still audited. Without `ivars:`, that state is allowlisted too, so use the bare form only for classes the gem adds no state to. A `name:` entry for an ivar a rule also covers keeps its own reason. A rule that covered nothing, or whose constant isn't loaded (never loaded by the audit, even if it is a declared autoload), is listed as stale. `BasicObject`, `Object`, `Kernel`, `Module` and `Class` are rejected as ancestors (every module has them), and so is any unknown key in an entry, so a typo cannot widen a rule. `audit.skip_autoloads` takes `name:` entries only.
 
 `strict_autoloads: true` needs `audit.require` to load everything, e.g. a file that calls your Zeitwerk loader's `eager_load!`. In a Rails engine, `MyGem::Engine.eager_load!` is a no-op (Rails 7+): call `Zeitwerk::Loader.eager_load_namespace(MyGem)` after booting the dummy app instead, and reference constants in `autoload_once_paths` explicitly.
 
