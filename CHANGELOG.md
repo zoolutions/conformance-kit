@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `ConformanceKit::Store.fetch` on a non-main Ractor below Ruby 3.4: threads that race on the first fetch now all get the first value stored, instead of each keeping its own (found by zoolutions/docs-kit#103, whose copy of the Store had the same `||= [yield]`).
+
 ## 0.4.0
 
 - `main_only:` takes `ancestor:` rules (with optional `ivars:`): framework class state on the gem's own subclasses (ActiveRecord, ActionController, Rails::Engine, ActiveSupport::Concern, ...) in one entry per framework instead of one per ivar per class. Constants are never covered; unused rules are listed as stale; an entry with an unknown key, or an ancestor every module has (`Object`, `Module`, ...), is a config error. `Audit::Finding` gains a `rule` member (the covering rule, or nil).

@@ -61,6 +61,32 @@ RSpec.describe ConformanceKit::Store do
     it_behaves_like "a lazy store"
   end
 
+  context "on a non-main Ractor's fallback (Ractor-local storage, Ruby 3.2/3.3)", if: defined?(Ractor) do
+    before do
+      allow(described_class).to receive_messages(native?: false, main_ractor?: false)
+    end
+
+    it_behaves_like "a lazy store"
+
+    it "hands every thread the first value published when they race on the build" do
+      arrived = Queue.new
+      release = Queue.new
+      threads = Array.new(8) do
+        Thread.new do
+          described_class.fetch(key) do
+            arrived << true
+            release.pop # every thread is inside the initializer before any finishes
+            Object.new
+          end
+        end
+      end
+      8.times { arrived.pop }
+      8.times { release << true }
+
+      expect(threads.map(&:value).uniq(&:object_id).size).to eq(1)
+    end
+  end
+
   context "when Ractor.store_if_absent is available", if: defined?(Ractor) && Ractor.respond_to?(:store_if_absent) do
     it "delegates to it" do
       allow(Ractor).to receive(:store_if_absent).and_call_original
