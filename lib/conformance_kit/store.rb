@@ -8,8 +8,11 @@ module ConformanceKit
   # a Mutex, created at load (never lazily, so there is no check-then-set race);
   # it is the kit's one allowlisted main-only state (.conformance.yml). A
   # non-main Ractor on 3.2/3.3 cannot read it, so it keeps its own values in
-  # Ractor-local storage instead (not locked: one Ractor's threads may race to
-  # build a value, as with any `||=`).
+  # Ractor-local storage instead. No lock can be shared there, so threads of
+  # one Ractor may each build a value; they all return the first one
+  # published, except in the rare case of a thread switch inside the publish
+  # itself (`Ractor.current[slot] ||= built` is a read and a write), which no
+  # Ractor-local primitive before 3.4 can close.
   module Store
     # rubocop:disable ThreadSafety/MutableClassInstanceVariable -- main-only fallback, guarded by @fallback_lock
     @fallback_lock = Mutex.new
@@ -31,9 +34,17 @@ module ConformanceKit
 
       def main_ractor? = !defined?(::Ractor) || ::Ractor.current == ::Ractor.main
 
-      # Boxed, so a nil or false value is cached rather than rebuilt on every fetch.
+      # Boxed, so a nil or false value is cached rather than rebuilt on every
+      # fetch. Built before the check-and-publish, never between them: threads
+      # that raced on the build return whichever value was stored first (see
+      # the module comment for the switch-inside-the-publish limit).
       def ractor_local(key)
-        (::Ractor.current[:"conformance_kit_store/#{key}"] ||= [yield]).first
+        slot = :"conformance_kit_store/#{key}"
+        stored = ::Ractor.current[slot]
+        return stored.first if stored
+
+        built = [yield]
+        (::Ractor.current[slot] ||= built).first
       end
 
       public
