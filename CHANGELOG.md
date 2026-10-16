@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1
 
 - `ConformanceKit::Store.fetch` on a non-main Ractor below Ruby 3.4: threads that race on the first fetch now get the first value stored instead of each keeping its own (the race shrinks from the whole initializer to the publish; a thread switch inside the publish itself remains possible, as no Ractor-local lock exists before 3.4) (found by zoolutions/docs-kit#103, whose copy of the Store had the same `||= [yield]`).
 
