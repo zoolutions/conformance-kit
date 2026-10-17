@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.2 - 2026-10-17
 
 - A Proc or lock found inside another value now reads as one sentence: `[:save] is a Proc that is never shareable: ...` and `.@lock is a Thread::Mutex that is main-only: ...` instead of `is a Proc is never shareable` (in `conformance-audit` findings and `"a boot-finalized configuration"` failures; a top-level one reads `a Proc that is never shareable`).
 
