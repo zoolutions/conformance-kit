@@ -199,7 +199,7 @@ permissions:
 
 jobs:
   conformance:
-    uses: zoolutions/conformance-kit/.github/workflows/conformance.yml@v0.4.0
+    uses: zoolutions/conformance-kit/.github/workflows/conformance.yml@v0.4.2
 ```
 
 To make it a merge requirement, add `conformance / Conformance settings` and `conformance / Conformance (Ruby 4.0)` to the required status checks in the repo's branch ruleset. Require both: if the settings job fails, the gate is skipped, and a skipped check does not block a merge. The prefix is the caller's job id (`conformance` above) and the Ruby is `ractor.ruby`, so the names change with either. Leave the probes out: they never fail. A repo or org that only allows selected actions must allow `zoolutions/conformance-kit/.github/workflows/conformance.yml@*`.
