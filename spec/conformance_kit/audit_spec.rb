@@ -66,6 +66,24 @@ RSpec.describe ConformanceKit::Audit do
         .to contain_exactly(a_string_including("AuditBasicObjectFixture.@primary_key (class ivar) BasicObject"))
     end
 
+    it "words a finding as one sentence, at the top level and nested" do
+      stub_const("AuditWordingFixture", Module.new do
+        const_set(:HOOK, proc { 1 })
+        const_set(:HOOKS, { save: proc { 1 } })
+        const_set(:LOCK, Mutex.new)
+        const_set(:LOCKS, { main: Mutex.new })
+      end)
+      never = "never shareable: use Ractor.shareable_proc (Ruby 4.0) or Ractor.make_shareable on a capture-free proc"
+      main_only = "main-only: keep per-Ractor state in ConformanceKit::Store, or allowlist it main_only"
+
+      expect(audit(namespaces: ["AuditWordingFixture"]).findings.map(&:to_s)).to eq(
+        ["AuditWordingFixture::HOOK (constant) Proc: a Proc that is #{never}",
+         "AuditWordingFixture::HOOKS (constant) Hash: [:save] is a Proc that is #{never}",
+         "AuditWordingFixture::LOCK (constant) Thread::Mutex: a Thread::Mutex that is #{main_only}",
+         "AuditWordingFixture::LOCKS (constant) Hash: [:main] is a Thread::Mutex that is #{main_only}"]
+      )
+    end
+
     it "stays inside the namespace" do
       expect(audit(namespaces: ["AuditFixture::Hooks"]).findings.map(&:name)).to eq(["AuditFixture::Hooks.@on_save"])
     end

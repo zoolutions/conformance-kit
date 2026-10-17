@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A Proc or lock found inside another value now reads as one sentence: `[:save] is a Proc that is never shareable: ...` and `.@lock is a Thread::Mutex that is main-only: ...` instead of `is a Proc is never shareable` (in `conformance-audit` findings and `"a boot-finalized configuration"` failures; a top-level one reads `a Proc that is never shareable`).
+
 ## 0.4.1 - 2026-10-16
 
 - `ConformanceKit::Store.fetch` on a non-main Ractor below Ruby 3.4: threads that race on the first fetch now get the first value stored instead of each keeping its own (the race shrinks from the whole initializer to the publish; a thread switch inside the publish itself remains possible, as no Ractor-local lock exists before 3.4) (found by zoolutions/docs-kit#103, whose copy of the Store had the same `||= [yield]`).
