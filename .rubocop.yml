@@ -23,7 +23,7 @@ Style/Documentation:
   Enabled: false
 
 # spec/fixtures/ violate the tiers ON PURPOSE: each check must be seen failing
-# on a violating fixture (.claude/rules/testing.md).
+# on a violating fixture (AGENTS.md, Testing).
 ThreadSafety:
   Exclude:
     - "spec/fixtures/**/*"
