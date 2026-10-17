@@ -1,0 +1,23 @@
+CHANGELOG.md
+  s_4786a62cd35147::t_8683ad48297556 5-6
+spec/conformance_kit/audit_spec.rb
+  s_4786a62cd35147::t_537deed38e4e78 69-86
+spec/conformance_kit/checks/boot_finalized_spec.rb
+  s_4786a62cd35147::t_50b2f136a5f770 31-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "de2e0e67566397f9d9d40eeaf8efc23bdd6e6396",
+  "prompts": {},
+  "sessions": {
+    "s_4786a62cd35147": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1e58604-bb1b-456c-ace0-8fe7f151dae8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
