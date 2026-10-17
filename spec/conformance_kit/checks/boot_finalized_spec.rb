@@ -28,6 +28,24 @@ RSpec.describe ConformanceKit::Checks::BootFinalized do
     expect(result.message).to include("Config.handler", "Proc", "shareable_proc")
   end
 
+  it "words each offense as one sentence, at the top level and nested" do
+    result = described_class.call(readers: {
+                                    "Config.handler" => -> { proc { 1 } },
+                                    "Config.hooks" => -> { { save: proc { 1 } } },
+                                    "Config.lock" => -> { Mutex.new },
+                                    "Config.locks" => -> { { main: Mutex.new } }
+                                  })
+    never = "never shareable: use Ractor.shareable_proc (Ruby 4.0) or Ractor.make_shareable on a capture-free proc"
+    main_only = "main-only: keep per-Ractor state in ConformanceKit::Store, or allowlist it main_only"
+
+    expect(result.message.lines.drop(1).map(&:strip)).to eq(
+      ["Config.handler returned Proc: it is a Proc that is #{never}",
+       "Config.hooks returned Hash: [:save] is a Proc that is #{never}",
+       "Config.lock returned Thread::Mutex: it is a Thread::Mutex that is #{main_only}",
+       "Config.locks returned Hash: [:main] is a Thread::Mutex that is #{main_only}"]
+    )
+  end
+
   it "names a bare lambda by its source location" do
     reader = -> { [] }
     result = described_class.call(readers: [reader])

@@ -79,10 +79,10 @@ module ConformanceKit
       def reason(value)
         name = class_name(value)
         if callable?(value)
-          "#{article(name)} #{name} is never shareable: use Ractor.shareable_proc (Ruby 4.0) " \
+          "#{article(name)} #{name} that is never shareable: use Ractor.shareable_proc (Ruby 4.0) " \
             "or Ractor.make_shareable on a capture-free proc"
         elsif lock?(value) || concurrent?(value)
-          "#{article(name)} #{name} is main-only: keep per-Ractor state in ConformanceKit::Store, " \
+          "#{article(name)} #{name} that is main-only: keep per-Ractor state in ConformanceKit::Store, " \
             "or allowlist it main_only"
         elsif !frozen?(value)
           "#{article(name)} #{name} that is not frozen: freeze it at boot (Ractor.make_shareable)"

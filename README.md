@@ -109,7 +109,7 @@ Requires the files, walks every loaded module under the namespaces (`--require` 
 
 ```
 conformance-audit: 2 findings in MyGem (1 allowlisted main-only; 14 modules audited, 0 unloaded autoloads skipped)
-  MyGem::LOCK (constant) Thread::Mutex: a Thread::Mutex is main-only: keep per-Ractor state in ConformanceKit::Store, or allowlist it main_only
+  MyGem::LOCK (constant) Thread::Mutex: a Thread::Mutex that is main-only: keep per-Ractor state in ConformanceKit::Store, or allowlist it main_only
   MyGem::Config.@colors (module ivar) Hash: [:primary] is an Array that is not frozen: freeze it at boot (Ractor.make_shareable)
 ```
 
