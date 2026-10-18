@@ -60,8 +60,8 @@ class RactorConformanceTest < Minitest::Test
   def constants_under(mod)
     mod.constants(false).reject { mod.autoload?(_1) }.flat_map do |name|
       value = mod.const_get(name, false)
-      own = value.is_a?(Module) && value.name == "#{mod}::#{name}"
-      [["#{mod}::#{name}", value], *(own ? constants_under(value) : [])]
+      own = value.is_a?(Module) && value.name == "#{mod.name}::#{name}"
+      [["#{mod.name}::#{name}", value], *(own ? constants_under(value) : [])]
     end
   end
 end
@@ -82,8 +82,8 @@ RSpec.describe "MyGem in a Ractor" do
     walk = lambda do |mod|
       mod.constants(false).reject { mod.autoload?(_1) }.flat_map do |name|
         value = mod.const_get(name, false)
-        own = value.is_a?(Module) && value.name == "#{mod}::#{name}"
-        [["#{mod}::#{name}", value], *(own ? walk.call(value) : [])]
+        own = value.is_a?(Module) && value.name == "#{mod.name}::#{name}"
+        [["#{mod.name}::#{name}", value], *(own ? walk.call(value) : [])]
       end
     end
     unshareable = walk.call(MyGem).reject { |name, value| main_only.key?(name) || Ractor.shareable?(value) }
@@ -92,7 +92,16 @@ RSpec.describe "MyGem in a Ractor" do
 end
 ```
 
-A failure names the constant and its class, e.g. `Expected ["MyGem::Html::ESCAPES (Hash)"] to be empty.` The Ractor block must not use outer local variables: write its input inline, or reach it through a constant. What these two leave out, and the kit covers: class and module instance variables (a `@cache ||= {}` memo), Procs and locks nested inside values, and races between threads and fibers.
+A failure names the constant and its class, e.g. `Expected ["MyGem::Html::ESCAPES (Hash)"] to be empty.` The Ractor block must not use outer local variables: write its input inline, or reach it through a constant.
+
+What these two leave out, and the kit covers:
+
+- class and module instance variables (a `@cache ||= {}` memo);
+- which value inside a constant is the problem: they name `MyGem::SETTINGS (Hash)`, the audit names `[:hooks] is a Proc that is never shareable`;
+- unloaded autoloads, which they skip without a word (the audit lists them);
+- races between threads and fibers.
+
+Neither sees a constant the gem defines under another namespace, such as an Active Job adapter in `ActiveJob::QueueAdapters`: walk that namespace too, or pass it to `--namespace`.
 
 ## Adding it to a gem
 
