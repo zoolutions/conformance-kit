@@ -102,6 +102,14 @@ RSpec.describe ConformanceKit::Config do
       end
     end
 
+    it "keeps a gem name as a feature when a directory of that name sits beside the file" do
+      with_config("audit:\n  require: [rack]\n") do |path, dir|
+        FileUtils.mkdir_p(File.join(dir, "rack"))
+
+        expect(described_class.load(path).audit_requires).to eq(["rack"])
+      end
+    end
+
     it "keeps a 0.1 file with only main_only: valid" do
       expect(load_yaml("main_only:\n  - name: MyGem::LOCK\n    reason: main-only\n").allowlist.names)
         .to eq(["MyGem::LOCK"])

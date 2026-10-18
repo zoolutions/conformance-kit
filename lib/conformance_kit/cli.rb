@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "optparse"
-require "conformance_kit"
+require_relative "../conformance_kit"
 require_relative "config"
 require_relative "cli/doctor"
 require_relative "cli/check"

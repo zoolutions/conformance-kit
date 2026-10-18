@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "conformance_kit"
+require_relative "../conformance_kit"
 require_relative "config"
 require_relative "audit/allowlist"
 require_relative "audit/cli"

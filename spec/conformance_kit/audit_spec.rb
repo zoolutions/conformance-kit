@@ -427,8 +427,10 @@ RSpec.describe ConformanceKit::Audit do
 
     it "audits an installed gem by name outside any bundle and without a .conformance.yml" do
       Dir.mktmpdir do |dir|
+        # An empty gem path: only this checkout's lib can load, never an installed conformance-kit.
+        gems = { "GEM_HOME" => dir, "GEM_PATH" => dir }
         out, err, status = Bundler.with_unbundled_env do
-          Open3.capture3(RbConfig.ruby, File.join(root, "exe/conformance-audit"), "--require", "json",
+          Open3.capture3(gems, RbConfig.ruby, File.join(root, "exe/conformance-audit"), "--require", "json",
                          "--namespace", "JSON", chdir: dir)
         end
 

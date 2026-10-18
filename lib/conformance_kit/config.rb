@@ -88,7 +88,7 @@ module ConformanceKit
     def self.require_target(entry, base)
       path = File.expand_path(entry, base)
       explicit = entry.start_with?("./", "../", "~") || File.absolute_path?(entry)
-      explicit || File.exist?(path) || File.exist?("#{path}.rb") ? path : entry
+      explicit || File.file?(path) || File.file?("#{path}.rb") ? path : entry
     end
 
     def audit_requires = self["audit.require"].map { self.class.require_target(_1, root) }
