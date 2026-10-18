@@ -56,7 +56,7 @@ module ConformanceKit
       def parser(options)
         OptionParser.new do |o|
           o.banner = "Usage: conformance-audit [--require FILE] [--namespace CONST] [--strict] [--config PATH]"
-          o.on("--require FILE", "Require FILE before auditing (repeatable; default audit.require)") do |file|
+          o.on("--require FILE", "Require FILE or a gem by name first (repeatable; default audit.require)") do |file|
             options[:requires] << file
           end
           o.on("--namespace CONST", "Audit CONST and all under it (repeatable; default audit.namespace)") do |name|
@@ -78,7 +78,7 @@ module ConformanceKit
       def requires(options, config)
         return config.audit_requires if options[:requires].empty?
 
-        options[:requires].map { File.expand_path(_1) }
+        options[:requires].map { Config.require_target(_1, Dir.pwd) }
       end
 
       def check_namespace(name)

@@ -265,6 +265,25 @@ RSpec.describe ConformanceKit::Audit do
       end
     end
 
+    describe "--require with a feature name instead of a path" do
+      around do |example|
+        $LOAD_PATH.unshift(File.dirname(fixture))
+        example.run
+      ensure
+        $LOAD_PATH.delete(File.dirname(fixture))
+      end
+
+      it "requires it from the load path, as for an installed gem" do
+        expect(run_cli("--require", "audit_fixture", "--namespace", "AuditFixture", "--allowlist", File::NULL)).to eq(0)
+        expect(out.string).to include("4 findings in AuditFixture")
+      end
+
+      it "exits 2 naming a feature that cannot be loaded" do
+        expect(run_cli("--require", "no_such_gem_for_the_audit", "--namespace", "AuditFixture")).to eq(2)
+        expect(err.string).to include("no_such_gem_for_the_audit")
+      end
+    end
+
     it "exits 2 without --namespace and without audit.namespace, naming both" do
       expect(run_cli("--require", fixture, "--allowlist", File::NULL)).to eq(2)
       expect(err.string).to include("--namespace", ".conformance.yml audit.namespace")
@@ -404,6 +423,18 @@ RSpec.describe ConformanceKit::Audit do
                                 "--allowlist", "spec/fixtures/audit_allowlist.yml")
 
       expect([failing.exitstatus, passing.exitstatus]).to eq([1, 0])
+    end
+
+    it "audits an installed gem by name outside any bundle and without a .conformance.yml" do
+      Dir.mktmpdir do |dir|
+        out, err, status = Bundler.with_unbundled_env do
+          Open3.capture3(RbConfig.ruby, File.join(root, "exe/conformance-audit"), "--require", "json",
+                         "--namespace", "JSON", chdir: dir)
+        end
+
+        expect(status.exitstatus).to eq(0), err
+        expect(out).to include("in JSON")
+      end
     end
 
     it "passes the kit's own audit from its .conformance.yml alone, nothing skipped" do

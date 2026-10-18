@@ -87,6 +87,21 @@ RSpec.describe ConformanceKit::Config do
       end
     end
 
+    it "resolves an audit.require without ./ when it names a file under the file's directory" do
+      with_config("audit:\n  require: [lib/my_gem]\n") do |path, dir|
+        FileUtils.mkdir_p(File.join(dir, "lib"))
+        File.write(File.join(dir, "lib/my_gem.rb"), "")
+
+        expect(described_class.load(path).audit_requires).to eq([File.join(dir, "lib/my_gem")])
+      end
+    end
+
+    it "keeps an audit.require that names no file as a feature for the load path (an installed gem)" do
+      with_config("audit:\n  require: [loofah]\n") do |path, _dir|
+        expect(described_class.load(path).audit_requires).to eq(["loofah"])
+      end
+    end
+
     it "keeps a 0.1 file with only main_only: valid" do
       expect(load_yaml("main_only:\n  - name: MyGem::LOCK\n    reason: main-only\n").allowlist.names)
         .to eq(["MyGem::LOCK"])

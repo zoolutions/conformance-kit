@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0 - 2026-10-18
+
+- `conformance-audit --require` and `audit.require` take a gem or feature name as well as a path: an entry that is not written as a path (`./`, `../`, `~`, absolute) and names no existing file is required from the load path. The kit now audits any installed gem with no Gemfile change and no `.conformance.yml`: `gem install conformance-kit` then `conformance-audit --require loofah --namespace Loofah`. Existing paths resolve as before.
+- README: how to try the audit on any gem, and a Minitest and an RSpec conformance case (the entry point in a non-main Ractor; every constant shareable) for gems that won't take the dependency.
+
 ## 0.4.2 - 2026-10-17
 
 - A Proc or lock found inside another value now reads as one sentence: `[:save] is a Proc that is never shareable: ...` and `.@lock is a Thread::Mutex that is main-only: ...` instead of `is a Proc is never shareable` (in `conformance-audit` findings and `"a boot-finalized configuration"` failures; a top-level one reads `a Proc that is never shareable`).

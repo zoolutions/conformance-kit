@@ -82,7 +82,16 @@ module ConformanceKit
       @values.fetch(key) { DEFAULTS[key] }
     end
 
-    def audit_requires = self["audit.require"].map { File.expand_path(_1, root) }
+    # An `audit.require` or `--require` entry: a path relative to +base+ when
+    # written as one (`./lib/my_gem`, `/abs/path`) or when it names a file
+    # there, otherwise a feature for the load path, such as an installed gem.
+    def self.require_target(entry, base)
+      path = File.expand_path(entry, base)
+      explicit = entry.start_with?("./", "../", "~") || File.absolute_path?(entry)
+      explicit || File.exist?(path) || File.exist?("#{path}.rb") ? path : entry
+    end
+
+    def audit_requires = self["audit.require"].map { self.class.require_target(_1, root) }
     def strict_autoloads? = self["audit.strict_autoloads"]
     def working_directory = File.expand_path(self["ractor.working_directory"], root)
 

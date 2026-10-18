@@ -1,6 +1,6 @@
 # conformance-kit
 
-Concurrency conformance for the zoolutions gems. A gem that adopts it is held to explicit tiers, each with a mechanical gate:
+Concurrency conformance for Ruby gems. Built for the zoolutions gems and usable by any gem: [audit a gem without adding anything to it](#try-it-on-any-gem), [copy the checks into your own tests](#a-conformance-case-without-the-kit), or adopt the kit. A gem that adopts it is held to explicit tiers, each with a mechanical gate:
 
 | Tier | Meaning | Gate |
 |---|---|---|
@@ -10,6 +10,91 @@ Concurrency conformance for the zoolutions gems. A gem that adopts it is held to
 | 4 compiler-probed | Spinel/Roundhouse readiness is measured, never gated | the probes job of `conformance.yml` (report-only) |
 
 Background, the finalize-at-boot pattern and the settled decisions: [zoolutions/phlex-reactive#363](https://github.com/zoolutions/phlex-reactive/issues/363).
+
+## Try it on any gem
+
+No Gemfile change and no `.conformance.yml`: install the kit, then name the gem to load and the namespace to audit.
+
+```bash
+gem install conformance-kit
+conformance-audit --require loofah --namespace Loofah
+```
+
+```
+conformance-audit: 42 findings in Loofah (0 allowlisted main-only; 38 modules audited, 0 unloaded autoloads skipped)
+  Loofah::Elements::BLOCK_LEVEL (constant) Set: a Set that is not frozen: freeze it at boot (Ractor.make_shareable)
+  ...
+  Loofah::Scrubbers::MAP (constant) Hash: a Hash that is not frozen: freeze it at boot (Ractor.make_shareable)
+report only: --strict fails on these
+```
+
+That is loofah 2.25.2 on Ruby 4.0.7: every finding is state a non-main Ractor cannot read. `--require` takes a gem or feature name (required from the load path, so any installed gem) or a file path, and repeats (`--require rack --require rack/mock_request`). Without `--strict` it only reports. What it can and can't see, and its exit codes: [`conformance-audit`](#conformance-audit).
+
+## A conformance case without the kit
+
+When a new development dependency is not an option (a framework, a gem that keeps its bundle small), the two checks that matter most fit in the gem's own tests. This is the shape of the case to attach to a compatibility pull request: it fails before the fix, passes after it, and fails again on the next constant that stops being shareable.
+
+```ruby
+# Minitest
+class RactorConformanceTest < Minitest::Test
+  # State that is main-only on purpose, each with why.
+  MAIN_ONLY = { "MyGem::REGISTRY" => "apps add to it at boot" }.freeze
+
+  def setup
+    skip "needs Ruby 4.0 (Ractor#value)" unless defined?(Ractor) && Ractor.method_defined?(:value)
+  end
+
+  # The entry point runs inside a non-main Ractor and gives the main Ractor's answer.
+  def test_runs_inside_a_non_main_ractor
+    assert_equal MyGem.render("<p>hi</p>"), Ractor.new { MyGem.render("<p>hi</p>") }.value
+  end
+
+  # Every constant under MyGem is shareable, so the next mutable one fails here.
+  def test_constants_are_shareable
+    unshareable = constants_under(MyGem).reject { |name, value| MAIN_ONLY.key?(name) || Ractor.shareable?(value) }
+    assert_empty unshareable.map { |name, value| "#{name} (#{value.class})" }
+  end
+
+  private
+
+  def constants_under(mod)
+    mod.constants(false).reject { mod.autoload?(_1) }.flat_map do |name|
+      value = mod.const_get(name, false)
+      own = value.is_a?(Module) && value.name == "#{mod}::#{name}"
+      [["#{mod}::#{name}", value], *(own ? constants_under(value) : [])]
+    end
+  end
+end
+```
+
+```ruby
+# RSpec
+RSpec.describe "MyGem in a Ractor" do
+  main_only = { "MyGem::REGISTRY" => "apps add to it at boot" }.freeze
+
+  before { skip "needs Ruby 4.0 (Ractor#value)" unless defined?(Ractor) && Ractor.method_defined?(:value) }
+
+  it "runs the entry point inside a non-main Ractor" do
+    expect(Ractor.new { MyGem.render("<p>hi</p>") }.value).to eq(MyGem.render("<p>hi</p>"))
+  end
+
+  it "keeps every constant under MyGem shareable" do
+    walk = lambda do |mod|
+      mod.constants(false).reject { mod.autoload?(_1) }.flat_map do |name|
+        value = mod.const_get(name, false)
+        own = value.is_a?(Module) && value.name == "#{mod}::#{name}"
+        [["#{mod}::#{name}", value], *(own ? walk.call(value) : [])]
+      end
+    end
+    unshareable = walk.call(MyGem).reject { |name, value| main_only.key?(name) || Ractor.shareable?(value) }
+    expect(unshareable.map { |name, value| "#{name} (#{value.class})" }).to be_empty
+  end
+end
+```
+
+A failure names the constant and its class, e.g. `Expected ["MyGem::Html::ESCAPES (Hash)"] to be empty.` The Ractor block must not use outer local variables: write its input inline, or reach it through a constant. What these two leave out, and the kit covers: class and module instance variables (a `@cache ||= {}` memo), Procs and locks nested inside values, and races between threads and fibers.
+
+## Adding it to a gem
 
 **A development dependency only.** Nothing here becomes a runtime dependency of your gem, and the kit adds none to your bundle: `async`, `minitest`, `rubocop-thread_safety` and `rubocop_spinel` are used only when you already have them. Ruby 3.2+; Ractor-only behaviour is gated on the running Ruby, never on a version floor.
 
@@ -105,7 +190,7 @@ bundle exec conformance-audit --strict                                         #
 bundle exec conformance-audit --require ./lib/my_gem --namespace MyGem --strict # flags override them
 ```
 
-Requires the files, walks every loaded module under the namespaces (`--require` and `--namespace` repeat; without them it reads `audit.require` and `audit.namespace`), and reports each public constant and class/module instance variable whose value is not `Ractor.shareable?`, with the path to the offending object and the fix:
+Requires the files (a `--require` or `audit.require` entry that is not a path to an existing file is required by name, as a gem), walks every loaded module under the namespaces (`--require` and `--namespace` repeat; without them it reads `audit.require` and `audit.namespace`), and reports each public constant and class/module instance variable whose value is not `Ractor.shareable?`, with the path to the offending object and the fix:
 
 ```
 conformance-audit: 2 findings in MyGem (1 allowlisted main-only; 14 modules audited, 0 unloaded autoloads skipped)
