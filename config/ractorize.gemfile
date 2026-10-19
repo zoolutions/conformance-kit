@@ -1,0 +1,25 @@
+# frozen_string_literal: true
+
+# The ractorize job's bundle: the repo's own Gemfile, with Rails, Rack and i18n
+# swapped for the branches `Rails.application.ractorize!` needs until they ship
+# (Rails 8.2, Rack's rack/ractorize, ruby-i18n/i18n#741). Copy it next to the
+# repo's Gemfile as Gemfile.ractorize and run with BUNDLE_GEMFILE=Gemfile.ractorize.
+ractorize_sources = {
+  "rails" => { github: "rails/rails", branch: "main" },
+  "rack" => { github: "rack/rack", branch: "main" },
+  "i18n" => { github: "Shopify/i18n", ref: "refs/pull/5/head" }
+}.freeze
+# Rails' own gems come from the same checkout as rails.
+replaced = %w[railties actionpack actionview activesupport activemodel activerecord activejob actionmailer
+              actioncable activestorage actiontext actionmailbox] + ractorize_sources.keys
+
+# The repo's own lines for these gems are dropped: Bundler refuses a gem declared twice.
+reading_repo_gemfile = true
+define_singleton_method(:gem) do |name, *args, **options, &block|
+  super(name, *args, **options, &block) unless reading_repo_gemfile && replaced.include?(name)
+end
+
+eval_gemfile File.expand_path("Gemfile", __dir__)
+reading_repo_gemfile = false
+
+ractorize_sources.each { |name, source| gem name, **source }

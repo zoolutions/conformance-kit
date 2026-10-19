@@ -1,0 +1,5 @@
+# The violating boot fixture: the ractorize job must fail it at boot.
+ractorize:
+  app: .
+  requests: [/widget]
+  audit_namespaces: [ViolatingBootEngine]

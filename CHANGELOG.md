@@ -4,6 +4,8 @@
 
 - `conformance-audit --require` and `audit.require` take a gem or feature name as well as a path: an entry that is not written as a path (`./`, `../`, `~`, absolute) and names no existing file is required from the load path. The kit now audits any installed gem with no Gemfile change and no `.conformance.yml`: `gem install conformance-kit` then `conformance-audit --require loofah --namespace Loofah`. Existing paths resolve as before.
 - README: how to try the audit on any gem, and a Minitest and an RSpec conformance case (the entry point in a non-main Ractor; every constant shareable) for gems that won't take the dependency.
+- The ractorize job (report-only, #22): `conformance-kit check --ractorize` boots `ractorize.app` in production with `ActiveSupport::Ractors.unshareable_proc_action = :raise`, calls `Rails.application.ractorize!`, serves each `ractorize.requests` path inside a non-main Ractor (a failure names the root cause and its first frame, also when an error page swallowed it) and audits `ractorize.audit_namespaces` (default `audit.namespace`) in the same process. It skips with the reason below Ruby 4.0 or on a Rails without `ractorize!`. New `.conformance.yml` keys: `ractorize.app`, `ractorize.requests`, `ractorize.audit_namespaces`, `ractorize.setup`.
+- `conformance.yml` gains a Ractorize job that runs when `ractorize.app` is set. It is `continue-on-error` until Rails 8.2 ships `ractorize!`, and bundles the repo with `config/ractorize.gemfile`: Rails main, Rack main and Shopify's i18n with Shopify/i18n#5, replacing the repo's own lines for them.
 
 ## 0.4.2 - 2026-10-17
 

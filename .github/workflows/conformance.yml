@@ -21,19 +21,22 @@ jobs:
     outputs:
       ruby: ${{ steps.read.outputs.ruby }}
       working-directory: ${{ steps.read.outputs.working-directory }}
+      ractorize-app: ${{ steps.read.outputs.ractorize-app }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       # The one shell read: setup-ruby needs these before conformance-kit is installed.
-      - name: Read ractor.ruby and ractor.working_directory
+      - name: Read ractor.ruby, ractor.working_directory and ractorize.app
         id: read
         run: |
           ruby=4.0
           dir=.
+          app=
           if [ -f "$CONFORMANCE_CONFIG" ]; then
             ruby=$(yq '.ractor.ruby // "4.0"' "$CONFORMANCE_CONFIG")
             dir=$(yq '.ractor.working_directory // "."' "$CONFORMANCE_CONFIG")
+            app=$(yq '.ractorize.app // ""' "$CONFORMANCE_CONFIG")
           fi
           if [[ ! "$ruby" =~ ^[A-Za-z0-9._-]+$ ]]; then
             echo "::error file=$CONFORMANCE_CONFIG::ractor.ruby must be a version like \"4.0\", got: $ruby"
@@ -43,8 +46,15 @@ jobs:
             echo "::error file=$CONFORMANCE_CONFIG::ractor.working_directory must be a path inside the repo, got: $dir"
             exit 1
           fi
-          echo "ruby=$ruby" >> "$GITHUB_OUTPUT"
-          echo "working-directory=$dir" >> "$GITHUB_OUTPUT"
+          if [[ -n "$app" && ( ! "$app" =~ ^[A-Za-z0-9._/-]+$ || "$app" == /* || "$app" == *..* ) ]]; then
+            echo "::error file=$CONFORMANCE_CONFIG::ractorize.app must be a path inside the repo, got: $app"
+            exit 1
+          fi
+          {
+            echo "ruby=$ruby"
+            echo "working-directory=$dir"
+            echo "ractorize-app=$app"
+          } >> "$GITHUB_OUTPUT"
 
   ractor:
     name: Conformance (Ruby ${{ needs.settings.outputs.ruby }})
@@ -103,6 +113,57 @@ jobs:
 
       - name: conformance-kit check
         run: bundle exec conformance-kit check --config "$GITHUB_WORKSPACE/$CONFORMANCE_CONFIG"
+
+  # Report-only until Rails ships Rails.application.ractorize! (8.2): boots the
+  # repo's test app on Rails main with ractorize!, serves ractorize.requests
+  # inside non-main Ractors and audits. Runs only when ractorize.app is set.
+  ractorize:
+    name: Ractorize (report-only)
+    needs: settings
+    if: needs.settings.outputs.ractorize-app != ''
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: ${{ needs.settings.outputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: ${{ needs.settings.outputs.ruby }}
+          working-directory: ${{ needs.settings.outputs.working-directory }}
+
+      # The repo's bundle first, to find the kit at the version in its lockfile.
+      - name: Gemfile.ractorize
+        run: |
+          bundle install --jobs 4
+          kit=$(bundle exec ruby -e 'print Gem.loaded_specs.fetch("conformance-kit").full_gem_path')
+          cp "$kit/config/ractorize.gemfile" Gemfile.ractorize
+
+      - name: Bundle Rails main, Rack main and i18n
+        env:
+          BUNDLE_GEMFILE: Gemfile.ractorize
+        run: bundle install --jobs 4
+
+      - name: conformance-kit check --ractorize
+        env:
+          BUNDLE_GEMFILE: Gemfile.ractorize
+        run: bundle exec conformance-kit check --ractorize --config "$GITHUB_WORKSPACE/$CONFORMANCE_CONFIG"
 
   probes:
     name: Compiler probes (report-only)

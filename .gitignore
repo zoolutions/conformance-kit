@@ -11,3 +11,7 @@ node_modules/
 .DS_Store
 .rspec_status
 Gemfile.lock
+# The ractorize lane: the bundle config/ractorize.gemfile makes, and what its fixture apps write.
+Gemfile.ractorize
+Gemfile.ractorize.lock
+/spec/fixtures/ractorize/*/tmp/
