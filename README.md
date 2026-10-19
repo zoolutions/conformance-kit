@@ -384,7 +384,7 @@ ractorize:
 ractorize: boot: ok
 ractorize: Rails.application.ractorize!: ok
   GET /widget -> 500 (0 bytes): Ractor::IsolationError: can not get unshareable values from instance variables of classes/modules from non-main Ractors (@registry from MyGem::Widget)
-      at spec/dummy/app/controllers/widgets_controller.rb:5:in 'WidgetsController#show'
+      at /home/runner/work/my_gem/my_gem/spec/dummy/app/controllers/widgets_controller.rb:5:in 'WidgetsController#show'
 ractorize: audit MyGem after ractorize!: 1 findings
   MyGem::Widget.@registry (class ivar) Hash: [:names] is an Array that is not frozen: freeze it at boot (Ractor.make_shareable)
 ractorize failed: 2 failures (failed requests and audit findings)

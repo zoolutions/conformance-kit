@@ -25,7 +25,6 @@ module ConformanceKit
 
         ActiveSupport::Ractors.unshareable_proc_action = :raise
         return 1 unless stage("boot") { boot }
-        return skip("Rails #{Rails.version} has no Rails.application.ractorize!") unless ractorize?
         return 1 unless stage("Rails.application.ractorize!") { ractorize }
 
         serve_requests
@@ -41,12 +40,15 @@ module ConformanceKit
         "Ractor#value is unavailable on #{RUBY_ENGINE} #{RUBY_VERSION} (needs Ruby 4.0)"
       end
 
+      # Checked before :raise is armed, so a Rails without ractorize! skips instead of failing its boot.
       def rails_reason
-        require "active_support"
+        require "rails"
         require "active_support/ractors"
-        nil
+        return if Rails::Application.method_defined?(:ractorize!)
+
+        "Rails #{Rails.version} has no Rails.application.ractorize!: run it with BUNDLE_GEMFILE=Gemfile.ractorize"
       rescue LoadError => e
-        return "Rails is not in the bundle: run it with BUNDLE_GEMFILE=Gemfile.ractorize" if e.path == "active_support"
+        return "Rails is not in the bundle: run it with BUNDLE_GEMFILE=Gemfile.ractorize" if e.path == "rails"
 
         "ActiveSupport::Ractors is unavailable (Rails before 8.2): run it with BUNDLE_GEMFILE=Gemfile.ractorize"
       end
@@ -58,8 +60,6 @@ module ConformanceKit
         require environment
         raise "#{environment} defined no Rails.application" unless defined?(::Rails) && ::Rails.application
       end
-
-      def ractorize? = Rails.application.respond_to?(:ractorize!)
 
       def ractorize
         Warning[:experimental] = false
