@@ -39,3 +39,22 @@ jobs:
           bundler-cache: true
       - run: bundle exec rubocop
 
+  # The ractorize job proven against fixture apps on Rails main, Rack main and
+  # Shopify/i18n#5 (config/ractorize.gemfile, as a consumer bundles it). They
+  # move under it, so it is report-only until Rails 8.2 ships ractorize!.
+  ractorize:
+    name: Ractorize lane (report-only)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile.ractorize
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: cp config/ractorize.gemfile Gemfile.ractorize
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: "4.0"
+          bundler-cache: true
+      - run: bundle exec rspec --tag ractorize

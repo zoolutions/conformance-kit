@@ -1,0 +1,9 @@
+# The conforming fixture: the ractorize job must pass it.
+ractorize:
+  app: .
+  requests: [/widget]
+  audit_namespaces: [ConformingEngine]
+main_only:
+  - ancestor: Rails::Engine
+    ivars: ["@called_from", "@initializers"]
+    reason: Rails::Engine's own class state, set by Rails at boot on the main Ractor

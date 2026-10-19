@@ -155,6 +155,44 @@ RSpec.describe ConformanceKit::Config do
     end
   end
 
+  describe "ractorize:" do
+    it "reads the section, resolving app against the file's directory" do
+      with_config(<<~YAML) do |path, dir|
+        ractorize:
+          app: spec/dummy
+          requests: [/, /widgets]
+          audit_namespaces: ["::MyGem"]
+          setup: bin/rails db:prepare
+      YAML
+        config = described_class.load(path)
+
+        expect(config.ractorize_app).to eq(File.join(dir, "spec/dummy"))
+        expect(config["ractorize.requests"]).to eq(["/", "/widgets"])
+        expect(config.ractorize_namespaces).to eq(["MyGem"])
+        expect(config["ractorize.setup"]).to eq("bin/rails db:prepare")
+      end
+    end
+
+    it "audits audit.namespace when audit_namespaces is unset" do
+      config = load_yaml("audit:\n  namespace: [MyGem]\nractorize:\n  app: spec/dummy\n")
+
+      expect(config.ractorize_namespaces).to eq(["MyGem"])
+      expect(config["ractorize.requests"]).to eq([])
+    end
+
+    it "has no app when the section is absent" do
+      expect(load_yaml("audit:\n  namespace: [MyGem]\n").ractorize_app).to be_nil
+    end
+
+    it "rejects an unknown ractorize key, naming it" do
+      expect(error_for("ractorize:\n  app: spec/dummy\n  request: [/]\n")).to include("ractorize.request")
+    end
+
+    it "rejects requests that are not a list" do
+      expect(error_for("ractorize:\n  requests: /\n")).to include("ractorize.requests must be a list")
+    end
+  end
+
   describe "validation" do
     it "rejects an unknown top-level key, naming the file and the key" do
       with_config("audits:\n  namespace: [MyGem]\n") do |path|

@@ -237,6 +237,61 @@ RSpec.describe ConformanceKit::CLI do
     end
   end
 
+  describe "check --ractorize" do
+    def check(path) = run_cli("check", "--config", path, "--ractorize")
+
+    def with_app(ractorize, env: nil)
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "app/config"))
+        File.write(File.join(dir, "app/config/environment.rb"), "")
+        yaml = "ractorize:\n  app: app\n#{ractorize}"
+        yaml << "ractor:\n  env:\n#{env.map { |name, value| "    #{name}: #{value.inspect}\n" }.join}" if env
+        File.write(File.join(dir, ".conformance.yml"), yaml)
+        yield File.join(dir, ".conformance.yml"), File.join(dir, "app")
+      end
+    end
+
+    it "exits 2 without ractorize.app, naming it" do
+      with_project("audit:\n  namespace: [MyGem]\n") do |path|
+        expect(check(path)).to eq(2)
+        expect(err.string).to include("ractorize.app")
+      end
+    end
+
+    it "exits 2 when ractorize.app has no config/environment.rb, naming the path" do
+      with_project("ractorize:\n  app: spec/dummy\n") do |path, dir|
+        expect(check(path)).to eq(2)
+        expect(err.string).to include(File.join(dir, "spec/dummy/config/environment.rb"))
+      end
+    end
+
+    it "runs ractorize.setup in the app with ractor.env and RAILS_ENV=production, then the runner" do
+      setup = "echo \"$CK_VALUE $RAILS_ENV\" > setup.txt"
+      with_app("  setup: #{setup.inspect}\n", env: { "CK_VALUE" => "wired" }) do |path, app|
+        check(path)
+
+        expect(File.read(File.join(app, "setup.txt"))).to eq("wired production\n")
+        expect(out.string).to include("==> ractorize #{app}")
+      end
+    end
+
+    it "stops at a failing ractorize.setup, naming the stage" do
+      with_app("  setup: \"exit 5\"\n") do |path|
+        expect(check(path)).to eq(5)
+        expect(out.string).to include("check failed at ractorize.setup")
+      end
+    end
+
+    it "reports the runner's skip and exits 0 outside the ractorize bundle" do
+      skip "this bundle has Rails (the ractorize lane)" if Gem.loaded_specs.key?("railties")
+
+      with_app("") do |path|
+        expect(check(path)).to eq(0)
+        expect(out.string).to include("ractorize: skipped:")
+      end
+    end
+  end
+
   describe "exe/conformance-kit check" do
     def exe(*args)
       Open3.capture2e("bundle", "exec", File.join(root, "exe/conformance-kit"), *args, chdir: root)

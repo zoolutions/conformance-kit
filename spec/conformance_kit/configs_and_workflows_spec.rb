@@ -144,6 +144,46 @@ RSpec.describe "config/ and the conformance workflow" do
     it "keeps rubocop_spinel out of the bundle: gem-installed in the probe only" do
       expect(runs).to include("gem install rubocop_spinel --version 0.2.0")
     end
+
+    describe "the ractorize job" do
+      let(:job) { jobs.fetch("ractorize") }
+      let(:script) { job.fetch("steps").filter_map { _1["run"] }.join("\n") }
+
+      it "runs only when ractorize.app is set, and never fails the workflow (report-only until Rails 8.2)" do
+        expect(jobs.fetch("settings").fetch("steps").filter_map { _1["run"] }.join).to include("yq '.ractorize.app")
+        expect(job["if"]).to eq("needs.settings.outputs.ractorize-app != ''")
+        expect(job["continue-on-error"]).to be(true)
+      end
+
+      it "bundles the repo with the kit's Gemfile.ractorize, then runs check --ractorize" do
+        expect(script).to include('config/ractorize.gemfile" Gemfile.ractorize',
+                                  "bundle exec conformance-kit check --ractorize")
+        expect(job.fetch("steps").filter_map { _1.dig("env", "BUNDLE_GEMFILE") }).to include("Gemfile.ractorize")
+      end
+
+      it "gives it the same postgres:18 service as the conformance job" do
+        expect(job.dig("services", "postgres")).to eq(jobs.fetch("ractor").dig("services", "postgres"))
+      end
+
+      it "rejects an absolute or escaping ractorize.app" do
+        expect(jobs.fetch("settings").fetch("steps").filter_map { _1["run"] }.join)
+          .to include('"$app" == /*', '"$app" == *..*')
+      end
+    end
+  end
+
+  describe ".github/workflows/main.yml" do
+    let(:lane) { load_yaml(".github/workflows/main.yml").fetch("jobs").fetch("ractorize") }
+
+    it "runs the ractorize fixture specs on Ruby 4.0 with Gemfile.ractorize, report-only" do
+      runs = lane.fetch("steps").filter_map { _1["run"] }.join("\n")
+
+      expect(lane["continue-on-error"]).to be(true)
+      expect(lane.dig("env", "BUNDLE_GEMFILE")).to eq("${{ github.workspace }}/Gemfile.ractorize")
+      expect(lane.fetch("steps").find { _1["uses"].to_s.start_with?("ruby/setup-ruby@") }.dig("with", "ruby-version"))
+        .to eq("4.0")
+      expect(runs).to include("cp config/ractorize.gemfile Gemfile.ractorize", "bundle exec rspec --tag ractorize")
+    end
   end
 
   describe ".github/workflows/conformance-self.yml" do

@@ -243,6 +243,11 @@ probes:
   gem_name: my_gem                             # required for the probes job
   paths: [lib]                                 # default [lib]
   roundhouse_app: spec/dummy                   # optional
+ractorize:                                     # optional: the report-only ractorize job (below)
+  app: spec/dummy                              # the Rails app to boot, relative to this file
+  requests: ["/", "/widgets/1"]                # GET paths served inside a non-main Ractor
+  audit_namespaces: [MyGem]                    # default audit.namespace
+  setup: bin/rails db:prepare                  # optional, run in the app
 main_only:
   - name: MyGem::Registry.@lock                # class/module ivar: Owner.@ivar
     reason: guards boot-time registration; no non-main Ractor ever registers
@@ -300,11 +305,12 @@ jobs:
 
 To make it a merge requirement, add `conformance / Conformance settings` and `conformance / Conformance (Ruby 4.0)` to the required status checks in the repo's branch ruleset. Require both: if the settings job fails, the gate is skipped, and a skipped check does not block a merge. The prefix is the caller's job id (`conformance` above) and the Ruby is `ractor.ruby`, so the names change with either. Leave the probes out: they never fail. A repo or org that only allows selected actions must allow `zoolutions/conformance-kit/.github/workflows/conformance.yml@*`.
 
-The workflow has three jobs:
+The workflow has four jobs:
 
-- **Conformance settings** reads `ractor.ruby` and `ractor.working_directory`.
+- **Conformance settings** reads `ractor.ruby`, `ractor.working_directory` and `ractorize.app`.
 - **Conformance (Ruby `ractor.ruby`)**, the gate: the version handshake, then `bundle exec conformance-kit check`. A `postgres:18` service (user and password `postgres`, port 5432) is always up; the workflow exports nothing, so `ractor.env` and `ractor.setup` wire it.
 - **Compiler probes (report-only)**: `rubocop_spinel` (gem-installed in the probe, never in your Gemfile), `spinel-compat probe <probes.gem_name> --dir .` and, when `probes.roundhouse_app` is set, `roundhouse check` (the release tarball, checked against a pinned SHA-256). Every probe continues on error; the reports go to the run summary and a `conformance-probes` artifact. It never fails a build, and it skips with a notice when `probes.gem_name` is unset.
+- **Ractorize (report-only)**, only when `ractorize.app` is set: [the ractorize job](#the-ractorize-job-report-only) on Rails main. It never fails the workflow; leave it out of the required checks.
 
 ### Staying current
 
@@ -336,6 +342,7 @@ updates:
 
 ```bash
 bundle exec conformance-kit check    # doctor, ractor.setup, ractor.test_command, then conformance-audit --strict
+bundle exec conformance-kit check --ractorize   # the ractorize job (below), with BUNDLE_GEMFILE=Gemfile.ractorize
 bundle exec conformance-kit doctor   # the static checks only
 bundle exec conformance-kit config probes.gem_name
 ```
@@ -352,6 +359,63 @@ bundle exec conformance-kit config probes.gem_name
 | 1 | a check failed (`check` exits with the failing stage's status) |
 | 2 | usage error or an invalid `.conformance.yml` |
 
+### The ractorize job (report-only)
+
+Rails 8.2 can serve an app's requests from several Ractors: `Rails.application.ractorize!` makes the booted app shareable, and every gem on the request path has to cope. The Ruby 4.0 canary runs your gem's own code in a Ractor. This job runs it inside a real app that has been ractorized, where Rails' framework hooks, the app's boot order and other engines meet it.
+
+```yaml
+# .conformance.yml
+ractorize:
+  app: spec/dummy                    # the Rails app to boot (its config/environment.rb), relative to this file
+  requests: ["/", "/widgets/1"]      # GET paths, each served inside a non-main Ractor after ractorize!
+  audit_namespaces: [MyGem]          # audited after ractorize!; default audit.namespace
+  setup: bin/rails db:prepare db:schema:cache:dump assets:precompile   # optional
+```
+
+`conformance-kit check --ractorize` runs it locally, and the workflow's Ractorize job runs the same when `ractorize.app` is set:
+
+1. `ractorize.setup` runs in the app, with `ractor.env`, `RAILS_ENV=production` and `SECRET_KEY_BASE_DUMMY=1`.
+2. A new process sets `ActiveSupport::Ractors.unshareable_proc_action = :raise` and boots the app in production. The test environment can't serve a ractorized request yet ([rails/rails#59168](https://github.com/rails/rails/issues/59168)).
+3. It calls `Rails.application.ractorize!`, then `require "i18n/ractorize"`.
+4. Each request runs inside `Ractor.new`. An exception fails it, and so does a 5xx; either way the report names the root cause and its first frame, including an exception the app's error page swallowed.
+5. The audit runs on the namespaces in the same process, with `main_only:` applied, so it sees what a request Ractor reads.
+
+```
+ractorize: boot: ok
+ractorize: Rails.application.ractorize!: ok
+  GET /widget -> 500 (0 bytes): Ractor::IsolationError: can not get unshareable values from instance variables of classes/modules from non-main Ractors (@registry from MyGem::Widget)
+      at spec/dummy/app/controllers/widgets_controller.rb:5:in 'WidgetsController#show'
+ractorize: audit MyGem after ractorize!: 1 findings
+  MyGem::Widget.@registry (class ivar) Hash: [:names] is an Array that is not frozen: freeze it at boot (Ractor.make_shareable)
+ractorize failed: 2 failures (failed requests and audit findings)
+```
+
+A block Rails can't make shareable stops the boot, and Ruby's message names the block's file and line (`Proc's self is not shareable: #<Proc:... lib/my_gem/engine.rb:8>`). Below Ruby 4.0, or on a Rails without `ractorize!`, the job skips with the reason and exits 0.
+
+**What the app needs.** Production settings that can be made shareable, as in Rails' own `railties/test/application/ractors_test.rb`:
+
+- `config.enable_reloading = false` and `config.eager_load = true` (a generated `production.rb` sets both);
+- `config.logger = ActiveSupport::Ractors::Logger.new`;
+- `config.cache_store = :null_store`, `config.public_file_server.enabled = false`, `config.action_cable.mount_path = nil` and `config.active_job.queue_adapter = :inline`.
+
+With Active Record, it also needs a dumped schema cache (`db:schema:cache:dump`) and `config.active_record.check_schema_cache_dump_version = false`: without them, a model's first query inside a Ractor fails, and nothing warns. Precompile assets in `setup`. Framework state on your engine's classes is main-only, so list it once in `main_only:` (e.g. `ancestor: Rails::Engine` with `ivars: ["@called_from", "@initializers"]`).
+
+**The bundle.** Until they ship, `ractorize!` needs:
+
+- Rails main;
+- Rack main, for `rack/ractorize`;
+- Shopify's i18n branch, pinned to [Shopify/i18n#5](https://github.com/Shopify/i18n/pull/5) until that merges: without it, every render fails on `I18n.fallbacks`.
+
+`config/ractorize.gemfile` swaps them into your Gemfile. It drops your own lines for those gems and Rails' component gems (Bundler refuses a gem declared twice) and keeps everything else. Copy it next to your Gemfile and bundle with it, as the workflow does; keep `Gemfile.ractorize` and its lock out of git.
+
+```bash
+cp "$(bundle exec ruby -e 'print Gem.loaded_specs["conformance-kit"].full_gem_path')/config/ractorize.gemfile" Gemfile.ractorize
+BUNDLE_GEMFILE=Gemfile.ractorize bundle install
+BUNDLE_GEMFILE=Gemfile.ractorize bundle exec conformance-kit check --ractorize
+```
+
+**Report-only.** Rails main moves under it, so the job is `continue-on-error` and never fails the workflow until Rails 8.2 ships `ractorize!`. This repo proves it the same way, with a "Ractorize lane" in its own CI: a failing and a passing fixture app on that bundle.
+
 ### The version handshake
 
 The behaviour a repo is held to comes from the `conformance-kit` in its lockfile; only the plumbing comes from the workflow tag. So that a stale lockfile cannot pass a newer workflow vacuously, the workflow reads its own tag from `job.workflow_ref` (the called workflow's ref; `github.workflow_ref` is the caller's) and fails with "bump conformance-kit to ~> X.Y" when the repo resolves anything older than `X.Y`. The version is derived, never stored. When the caller pins anything other than a `vX.Y.Z` tag (a branch, a commit SHA, or this repo's own `./` caller) the handshake is skipped with a notice, and so it is on GitHub Enterprise Server, which has no `job.workflow_ref`.
@@ -360,6 +424,11 @@ The behaviour a repo is held to comes from the `conformance-kit` in its lockfile
 
 ```bash
 bundle exec rake   # rspec + rubocop; CI runs Ruby 3.2, 3.4 and 4.0
+
+# The ractorize lane (Ruby 4.0; CI's report-only "Ractorize lane" job)
+cp config/ractorize.gemfile Gemfile.ractorize
+BUNDLE_GEMFILE=Gemfile.ractorize bundle install
+BUNDLE_GEMFILE=Gemfile.ractorize bundle exec rspec --tag ractorize
 ```
 
 Every check is proven both ways against `spec/fixtures/`: a violating fixture it must catch and a conforming one it must pass. The kit audits itself (`.conformance.yml`, strict, nothing skipped), and `conformance.yml` runs on its own pull requests.

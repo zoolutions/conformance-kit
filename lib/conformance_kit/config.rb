@@ -14,6 +14,7 @@ module ConformanceKit
   #   audit:    { require: [], namespace: [], strict_autoloads: false, skip_autoloads: [] }
   #   ractor:   { ruby: "4.0", test_command: "...", env: {}, setup: nil, working_directory: "." }
   #   probes:   { gem_name: nil, paths: [lib], roundhouse_app: nil }
+  #   ractorize: { app: nil, requests: [], audit_namespaces: [audit.namespace], setup: nil }
   #   main_only: []
   class Config
     DEFAULT_PATH = ".conformance.yml"
@@ -31,6 +32,10 @@ module ConformanceKit
       "probes.gem_name" => :string,
       "probes.paths" => :list,
       "probes.roundhouse_app" => :string,
+      "ractorize.app" => :string,
+      "ractorize.requests" => :list,
+      "ractorize.audit_namespaces" => :list,
+      "ractorize.setup" => :string,
       "main_only" => :entries
     }.freeze
 
@@ -44,10 +49,11 @@ module ConformanceKit
       "ractor.env" => {}.freeze,
       "ractor.working_directory" => ".",
       "probes.paths" => ["lib"].freeze,
+      "ractorize.requests" => [].freeze,
       "main_only" => [].freeze
     }.freeze
 
-    SECTIONS = %w[audit ractor probes].freeze
+    SECTIONS = %w[audit ractor probes ractorize].freeze
 
     def self.load(path = DEFAULT_PATH)
       root = File.dirname(File.expand_path(path))
@@ -65,7 +71,9 @@ module ConformanceKit
       @source = source
       @root = root
       @exists = exists
-      raise ConfigError, "#{source}: expected a mapping (audit:, ractor:, probes:, main_only:)" unless data.is_a?(Hash)
+      unless data.is_a?(Hash)
+        raise ConfigError, "#{source}: expected a mapping (audit:, ractor:, probes:, ractorize:, main_only:)"
+      end
 
       pairs = flatten(data).each { |key, _| unknown_key!(key, TYPES.keys) unless TYPES.key?(key) }
       # A key left blank is unset: its default applies, as in the workflow's yq read.
@@ -102,6 +110,15 @@ module ConformanceKit
     def strict_autoloads? = self["audit.strict_autoloads"]
     def working_directory = File.expand_path(self["ractor.working_directory"], root)
 
+    # The Rails app the ractorize job boots, or nil when `ractorize.app` is unset.
+    def ractorize_app = self["ractorize.app"]&.then { File.expand_path(_1, root) }
+
+    # What the ractorize job audits after `ractorize!`: its own list, or audit.namespace.
+    def ractorize_namespaces
+      namespaces = self["ractorize.audit_namespaces"]
+      namespaces.nil? || namespaces.empty? ? self["audit.namespace"] : namespaces
+    end
+
     private
 
     def flatten(data)
@@ -116,9 +133,12 @@ module ConformanceKit
       end
     end
 
+    NAMESPACE_KEYS = %w[audit.namespace ractorize.audit_namespaces].freeze
+    private_constant :NAMESPACE_KEYS
+
     # A namespace is matched by name: `::MyGem` is `MyGem`, as with --namespace.
     def normalize(key, value)
-      key == "audit.namespace" ? value.map { _1.delete_prefix("::") } : value
+      NAMESPACE_KEYS.include?(key) ? value.map { _1.delete_prefix("::") } : value
     end
 
     def validate(key, value)

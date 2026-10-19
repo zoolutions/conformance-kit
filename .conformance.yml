@@ -7,6 +7,7 @@ audit:
     - ./lib/conformance_kit/cli
     - ./lib/conformance_kit/rspec
     - ./lib/conformance_kit/minitest
+    - ./lib/conformance_kit/ractorize/runner
   namespace: [ConformanceKit]
   strict_autoloads: true
 ractor:
