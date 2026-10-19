@@ -1,0 +1,29 @@
+README.md
+  s_4786a62cd35147::t_9fd813de03c18b 39-40
+  s_4786a62cd35147::t_4f0ed650a8fc18 204
+spec/conformance_kit/audit_spec.rb
+  s_4786a62cd35147::t_70ac9df25e2f97 269-270,272,275,279-281
+lib/conformance_kit/config.rb
+  s_4786a62cd35147::t_f6a049023b6373 3
+  s_4786a62cd35147::t_9520311442cada 87-89,93,96-99
+spec/fixtures/load_path/load_path_fixture.rb
+  s_4786a62cd35147::t_f074457fc63cd6 1-7
+spec/conformance_kit/config_spec.rb
+  s_4786a62cd35147::t_13d03f6fa643eb 99-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "67326a11b53f207bf7d5eb09a8e4ce02a369a8ae",
+  "prompts": {},
+  "sessions": {
+    "s_4786a62cd35147": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1e58604-bb1b-456c-ace0-8fe7f151dae8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
