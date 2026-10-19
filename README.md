@@ -36,6 +36,8 @@ When a new development dependency is not an option (a framework, a gem that keep
 
 ```ruby
 # Minitest
+require "minitest/autorun" # or your test_helper
+
 class RactorConformanceTest < Minitest::Test
   # State that is main-only on purpose, each with why.
   MAIN_ONLY = { "MyGem::REGISTRY" => "apps add to it at boot" }.freeze
@@ -199,7 +201,7 @@ bundle exec conformance-audit --strict                                         #
 bundle exec conformance-audit --require ./lib/my_gem --namespace MyGem --strict # flags override them
 ```
 
-Requires the files (a `--require` or `audit.require` entry that is not a path to an existing file is required by name, as a gem), walks every loaded module under the namespaces (`--require` and `--namespace` repeat; without them it reads `audit.require` and `audit.namespace`), and reports each public constant and class/module instance variable whose value is not `Ractor.shareable?`, with the path to the offending object and the fix:
+Requires the files (an entry starting with `./`, `../`, `~` or `/` is a path; any other is required by name from the load path, as a gem, unless it names an existing file), walks every loaded module under the namespaces (`--require` and `--namespace` repeat; without them it reads `audit.require` and `audit.namespace`), and reports each public constant and class/module instance variable whose value is not `Ractor.shareable?`, with the path to the offending object and the fix:
 
 ```
 conformance-audit: 2 findings in MyGem (1 allowlisted main-only; 14 modules audited, 0 unloaded autoloads skipped)

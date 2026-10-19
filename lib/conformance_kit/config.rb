@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "rbconfig"
 require "yaml"
 require_relative "audit/allowlist"
 
@@ -83,13 +84,19 @@ module ConformanceKit
     end
 
     # An `audit.require` or `--require` entry: a path relative to +base+ when
-    # written as one (`./lib/my_gem`, `/abs/path`) or when it names a file
-    # there, otherwise a feature for the load path, such as an installed gem.
+    # written as one (`./lib/my_gem`, `/abs/path`) or when it names a Ruby file
+    # or native extension there, otherwise a feature for the load path, such as
+    # an installed gem.
     def self.require_target(entry, base)
       path = File.expand_path(entry, base)
       explicit = entry.start_with?("./", "../", "~") || File.absolute_path?(entry)
-      explicit || File.file?(path) || File.file?("#{path}.rb") ? path : entry
+      explicit || requirable_file?(path) ? path : entry
     end
+
+    def self.requirable_file?(path)
+      ["", ".rb", ".#{RbConfig::CONFIG['DLEXT']}"].any? { File.file?("#{path}#{_1}") }
+    end
+    private_class_method :requirable_file?
 
     def audit_requires = self["audit.require"].map { self.class.require_target(_1, root) }
     def strict_autoloads? = self["audit.strict_autoloads"]
