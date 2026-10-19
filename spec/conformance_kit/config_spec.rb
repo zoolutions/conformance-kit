@@ -96,6 +96,15 @@ RSpec.describe ConformanceKit::Config do
       end
     end
 
+    it "resolves an audit.require without ./ when it names a native extension under the file's directory" do
+      with_config("audit:\n  require: [lib/my_ext]\n") do |path, dir|
+        FileUtils.mkdir_p(File.join(dir, "lib"))
+        File.write(File.join(dir, "lib/my_ext.#{RbConfig::CONFIG['DLEXT']}"), "")
+
+        expect(described_class.load(path).audit_requires).to eq([File.join(dir, "lib/my_ext")])
+      end
+    end
+
     it "keeps an audit.require that names no file as a feature for the load path (an installed gem)" do
       with_config("audit:\n  require: [loofah]\n") do |path, _dir|
         expect(described_class.load(path).audit_requires).to eq(["loofah"])

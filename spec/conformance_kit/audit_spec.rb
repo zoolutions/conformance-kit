@@ -266,16 +266,19 @@ RSpec.describe ConformanceKit::Audit do
     end
 
     describe "--require with a feature name instead of a path" do
+      load_path = File.expand_path("../fixtures/load_path", __dir__)
+
       around do |example|
-        $LOAD_PATH.unshift(File.dirname(fixture))
+        $LOAD_PATH.unshift(load_path)
         example.run
       ensure
-        $LOAD_PATH.delete(File.dirname(fixture))
+        $LOAD_PATH.delete(load_path)
       end
 
       it "requires it from the load path, as for an installed gem" do
-        expect(run_cli("--require", "audit_fixture", "--namespace", "AuditFixture", "--allowlist", File::NULL)).to eq(0)
-        expect(out.string).to include("4 findings in AuditFixture")
+        expect(run_cli("--require", "load_path_fixture", "--namespace", "LoadPathFixture",
+                       "--allowlist", File::NULL)).to eq(0)
+        expect(out.string).to include("1 findings in LoadPathFixture", "LoadPathFixture::NAMES")
       end
 
       it "exits 2 naming a feature that cannot be loaded" do
