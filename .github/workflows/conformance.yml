@@ -152,7 +152,11 @@ jobs:
       - name: Gemfile.ractorize
         run: |
           bundle install --jobs 4
-          kit=$(bundle exec ruby -e 'print Gem.loaded_specs.fetch("conformance-kit").full_gem_path')
+          kit=$(bundle exec ruby -e 'spec = Gem.loaded_specs["conformance-kit"]; print spec.full_gem_path if spec')
+          if [ -z "$kit" ]; then
+            echo "::error::conformance-kit is not in the bundle: add gem \"conformance-kit\", require: false"
+            exit 1
+          fi
           cp "$kit/config/ractorize.gemfile" Gemfile.ractorize
 
       - name: Bundle Rails main, Rack main and i18n
