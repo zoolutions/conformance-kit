@@ -1,0 +1,19 @@
+config/ractorize.gemfile
+  s_9e043644f0fd3a::t_146c694dbd6e6a 39-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c5c62394b1b3c519690e22e7d4f6100d725be9d6",
+  "prompts": {},
+  "sessions": {
+    "s_9e043644f0fd3a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d039026-be65-4fd3-b956-3b6007ebc21a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
