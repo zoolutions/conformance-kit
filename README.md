@@ -405,8 +405,9 @@ With Active Record, it also needs a dumped schema cache (`db:schema:cache:dump`)
 - Rails main;
 - Rack main, for `rack/ractorize`;
 - Shopify's i18n branch, pinned to [Shopify/i18n#5](https://github.com/Shopify/i18n/pull/5) until that merges: without it, every render fails on `I18n.fallbacks`.
+- prism below 2, until refract releases [yippee-fun/refract#4](https://github.com/yippee-fun/refract/pull/4): refract 1.1.0, which Phlex loads, references `Prism::MissingNode`, which prism 2 removed, so with prism 2 the app fails at boot.
 
-`config/ractorize.gemfile` swaps them into your Gemfile. It drops your own lines for those gems and Rails' component gems (Bundler refuses a gem declared twice) and keeps everything else. Copy it next to your Gemfile and bundle with it, as the workflow does; keep `Gemfile.ractorize` and its lock out of git.
+`config/ractorize.gemfile` swaps them into your Gemfile. It drops your own lines for those gems and Rails' component gems (Bundler refuses a gem declared twice), adds the prism cap to your own prism requirement (or declares it), and keeps everything else. Copy it next to your Gemfile and bundle with it, as the workflow does; keep `Gemfile.ractorize` and its lock out of git.
 
 ```bash
 cp "$(bundle exec ruby -e 'print Gem.loaded_specs["conformance-kit"].full_gem_path')/config/ractorize.gemfile" Gemfile.ractorize
