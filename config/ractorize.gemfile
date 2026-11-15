@@ -2,24 +2,45 @@
 
 # The ractorize job's bundle: the repo's own Gemfile, with Rails, Rack and i18n
 # swapped for the branches `Rails.application.ractorize!` needs until they ship
-# (Rails 8.2, Rack's rack/ractorize, ruby-i18n/i18n#741). Copy it next to the
-# repo's Gemfile as Gemfile.ractorize and run with BUNDLE_GEMFILE=Gemfile.ractorize.
+# (Rails 8.2, Rack's rack/ractorize, ruby-i18n/i18n#741), and the caps below.
+# Copy it next to the repo's Gemfile as Gemfile.ractorize and run with
+# BUNDLE_GEMFILE=Gemfile.ractorize.
 ractorize_sources = {
   "rails" => { github: "rails/rails", branch: "main" },
   "rack" => { github: "rack/rack", branch: "main" },
   "i18n" => { github: "Shopify/i18n", ref: "refs/pull/5/head" }
 }.freeze
+# Upper bounds a fresh resolve needs, added to the repo's own requirement for the gem.
+# prism < 2: refract 1.1.0, which Phlex loads, references Prism::MissingNode, which
+# prism 2 removed. Drop it once refract releases yippee-fun/refract#4 (yippee-fun/refract#6).
+ractorize_caps = { "prism" => "< 2" }.freeze
 # Rails' own gems come from the same checkout as rails.
 replaced = %w[railties actionpack actionview activesupport activemodel activerecord activejob actionmailer
               actioncable activestorage actiontext actionmailbox] + ractorize_sources.keys
 
 # The repo's own lines for these gems are dropped: Bundler refuses a gem declared twice.
 reading_repo_gemfile = true
+capped = []
 define_singleton_method(:gem) do |name, *args, **options, &block|
-  super(name, *args, **options, &block) unless reading_repo_gemfile && replaced.include?(name)
+  next if reading_repo_gemfile && replaced.include?(name)
+
+  if (cap = ractorize_caps[name])
+    capped << name
+    # A gemspec's development dependency passes its options as a trailing Hash: the cap goes before it.
+    args = args.dup.insert(args.index { _1.is_a?(Hash) } || args.size, cap)
+  end
+  super(name, *args, **options, &block)
 end
 
 eval_gemfile File.expand_path("Gemfile", __dir__)
 reading_repo_gemfile = false
 
 ractorize_sources.each { |name, source| gem name, **source }
+ractorize_caps.each do |name, cap|
+  next if capped.include?(name)
+
+  # Bundler 2.6.5+ adds a gemspec's development dependencies without calling +gem+: keep their requirement.
+  own = dependencies.find { _1.name == name }
+  requirement = own ? own.requirement.as_list - [">= 0"] : []
+  gem name, *requirement, cap
+end

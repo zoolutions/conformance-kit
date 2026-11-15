@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 - 2026-11-14
+
+- `config/ractorize.gemfile` caps prism below 2, added to the repo's own prism requirement or declared when it has none. A fresh resolve picks prism 2 now that minitest 6.1 no longer caps it, and refract 1.1.0 (which Phlex loads) references `Prism::MissingNode`, which prism 2 removed, so a Phlex app's ractorize job failed at boot with `NameError: uninitialized constant Prism::MissingNode`. The cap goes once refract releases yippee-fun/refract#4 (yippee-fun/refract#6).
+
 ## 0.5.0 - 2026-10-18
 
 - `conformance-audit --require` and `audit.require` take a gem or feature name as well as a path: an entry that is not written as a path (`./`, `../`, `~`, absolute) and names no existing file is required from the load path. The kit now audits any installed gem with no Gemfile change and no `.conformance.yml`: `gem install conformance-kit` then `conformance-audit --require loofah --namespace Loofah`. Existing paths resolve as before.
